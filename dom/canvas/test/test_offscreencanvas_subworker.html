@@ -83,6 +83,7 @@ function runTest() {
 SpecialPowers.pushPrefEnv({'set': [
   ['gfx.offscreencanvas.enabled', true],
   ['webgl.force-enabled', true],
+  ['webgl.disable-angle', true]
 ]}, runTest);
 
 </script>
