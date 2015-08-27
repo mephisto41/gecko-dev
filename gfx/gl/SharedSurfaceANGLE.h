@@ -84,6 +84,8 @@ public:
     }
 
     virtual bool ToSurfaceDescriptor(layers::SurfaceDescriptor* const out_descriptor) override;
+
+    virtual bool ReadbackBySharedHandle(gfx::DataSourceSurface* out_surface) override;
 };
 
 
