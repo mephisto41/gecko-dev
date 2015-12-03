@@ -8,11 +8,11 @@
   </title>
   <script src='/tests/SimpleTest/SimpleTest.js'></script>
   <link rel='stylesheet' type='text/css' href='/tests/SimpleTest/test.css'/>
-  <script src='../.mozilla/iframe-autoresize.js'></script>
+  <script src='../iframe-autoresize.js'></script>
 </head>
 <body>
   <iframe id='mochi-single' style='border:none' width='100%' scrolling='no'
-          src='../.mozilla/mochi-single.html?%%TEST_PATH%%'>
+          src='../mochi-single.html?../%%TEST_PATH%%'>
   </iframe>
   <script>
     SimpleTest.requestFlakyTimeout("untriaged");

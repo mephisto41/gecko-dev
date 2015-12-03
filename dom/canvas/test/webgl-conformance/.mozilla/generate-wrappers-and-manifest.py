@@ -11,10 +11,11 @@ import re
 
 CURRENT_VERSION = '1.0.3'
 
+# All paths in this file are based where this file is run.
 WRAPPER_TEMPLATE_FILE = 'mochi-wrapper.html.template'
 MANIFEST_TEMPLATE_FILE = 'mochitest.ini.template'
 ERRATA_FILE = 'mochitest-errata.ini'
-DEST_MANIFEST_FILE = 'mochitest.ini'
+DEST_MANIFEST_PATHSTR = '../../generated-webgl-conformance.ini'
 
 BASE_TEST_LIST_PATHSTR = '../00_test_list.txt'
 GENERATED_PATHSTR = 'generated'
@@ -55,7 +56,7 @@ def GetTestList():
         basePath = split[0]
 
     curVersion = CURRENT_VERSION
-    testList = []
+    testList = ['always-fail.html']
     AccumTests(basePath, testListFile, curVersion, testList)
 
     testList = [os.path.relpath(x, basePath).replace(os.sep, '/') for x in testList]
@@ -307,16 +308,16 @@ def WriteWrappers(testWebPathStrList):
     return wrapperManifestPathStrList
 
 
-def PathStrFromManifestDir(pathStr):
-    #print 'PathFromManifestDir({})'.format(pathStr)
-    relPath = os.path.relpath(pathStr, GENERATED_PATHSTR)
-    relPath = relPath.replace(os.sep, '/')
-    #print 'relPath: ' + relPath
-    return relPath
+kManifestRelPathStr = os.path.relpath('.', os.path.dirname(DEST_MANIFEST_PATHSTR))
+kManifestRelPathStr = kManifestRelPathStr.replace(os.sep, '/')
+
+def ManifestPathStr(pathStr):
+    pathStr = kManifestRelPathStr + '/' + pathStr
+    return os.path.normpath(pathStr).replace(os.sep, '/')
 
 
-def WriteManifest(wrapperManifestPathStrList, supportFilePathStrList):
-    destPathStr = GENERATED_PATHSTR + '/' + DEST_MANIFEST_FILE
+def WriteManifest(wrapperPathStrList, supportPathStrList):
+    destPathStr = DEST_MANIFEST_PATHSTR
     print 'Generating manifest: ' + destPathStr
 
     errataMap = LoadErrata()
@@ -332,23 +333,23 @@ def WriteManifest(wrapperManifestPathStrList, supportFilePathStrList):
     defaultSectionStr = '\n'.join(defaultSectionLines)
 
     # SUPPORT_FILES
-    supportFilePathStrList = sorted(supportFilePathStrList)
-    supportFilePathStrList = [PathStrFromManifestDir(x) for x in supportFilePathStrList]
-    supportFilesStr = '\n'.join(supportFilePathStrList)
+    supportPathStrList = [ManifestPathStr(x) for x in supportPathStrList]
+    supportPathStrList = sorted(supportPathStrList)
+    supportFilesStr = '\n'.join(supportPathStrList)
 
     # MANIFEST_TESTS
     manifestTestLineList = []
-    for wrapperManifestPathStr in wrapperManifestPathStrList:
-        wrapperManifestPathStr = PathStrFromManifestDir(wrapperManifestPathStr)
+    wrapperPathStrList = sorted(wrapperPathStrList)
+    for wrapperPathStr in wrapperPathStrList:
+        #print 'wrapperPathStr: ' + wrapperPathStr
 
-        # transformedSectionName: '[webgl-conformance/foo.html]'
-        transformedSectionName = '[' + wrapperManifestPathStr + ']'
-        manifestTestLineList.append(transformedSectionName)
+        wrapperManifestPathStr = ManifestPathStr(wrapperPathStr)
+        sectionName = '[' + wrapperManifestPathStr + ']'
+        manifestTestLineList.append(sectionName)
 
-        #print 'wrapperManifestPathStr: ' + wrapperManifestPathStr
-        if wrapperManifestPathStr in errataMap:
-            manifestTestLineList += errataMap[wrapperManifestPathStr]
-            del errataMap[wrapperManifestPathStr]
+        if wrapperPathStr in errataMap:
+            manifestTestLineList += errataMap[wrapperPathStr]
+            del errataMap[wrapperPathStr]
 
         continue
 
@@ -430,9 +431,8 @@ def LoadErrata():
         if sectionName == None:
             continue
         elif sectionName != 'DEFAULT':
-            wrapperPath = GENERATED_PATHSTR + '/' + sectionName
-            wrapperPath = wrapperPath.replace('/', os.sep)
-            assert os.path.exists(wrapperPath), 'Line {}: {}'.format(sectionLineNum, sectionName)
+            path = sectionName.replace('/', os.sep)
+            assert os.path.exists(path), 'Line {}: {}'.format(sectionLineNum, sectionName)
 
         for (key, (lineNum, val)) in sectionMap.iteritems():
             assert key in ACCEPTABLE_ERRATA_KEYS, 'Line {}: {}'.format(lineNum, key)
@@ -454,7 +454,6 @@ def GetSupportFileList():
     for pathStr in SUPPORT_DIRS:
         ret += GetFilePathListForDir(pathStr)
         continue
-
 
     for pathStr in ret:
         path = pathStr.replace('/', os.sep)
@@ -479,11 +478,11 @@ if __name__ == '__main__':
     fileDir = os.path.dirname(__file__)
     assert not fileDir, 'Run this file from its directory, not ' + fileDir
 
-    testWebPathStrList = GetTestList()
-    wrapperFilePathStrList = WriteWrappers(testWebPathStrList)
+    testPathStrList = GetTestList()
+    wrapperPathStrList = WriteWrappers(testPathStrList)
 
-    supportFilePathStrList = GetSupportFileList()
+    supportPathStrList = GetSupportFileList()
 
-    WriteManifest(wrapperFilePathStrList, supportFilePathStrList)
+    WriteManifest(wrapperPathStrList, supportPathStrList)
 
     print('Done!')
