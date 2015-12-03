@@ -1,3 +1,25 @@
+/*
+** Copyright (c) 2012 The Khronos Group Inc.
+**
+** Permission is hereby granted, free of charge, to any person obtaining a
+** copy of this software and/or associated documentation files (the
+** "Materials"), to deal in the Materials without restriction, including
+** without limitation the rights to use, copy, modify, merge, publish,
+** distribute, sublicense, and/or sell copies of the Materials, and to
+** permit persons to whom the Materials are furnished to do so, subject to
+** the following conditions:
+**
+** The above copyright notice and this permission notice shall be included
+** in all copies or substantial portions of the Materials.
+**
+** THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+** MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
+*/
 GLSLGenerator = (function() {
 
 var vertexShaderTemplate = [
@@ -21,9 +43,7 @@ var vertexShaderTemplate = [
 ].join("\n");
 
 var fragmentShaderTemplate = [
-  "#if defined(GL_ES)",
   "precision mediump float;",
-  "#endif",
   "",
   "varying vec4 vColor;",
   "",
@@ -52,10 +72,21 @@ var baseVertexShader = [
   "}"
 ].join("\n");
 
+var baseVertexShaderWithColor = [
+  "attribute vec4 aPosition;",
+  "attribute vec4 aColor;",
+  "",
+  "varying vec4 vColor;",
+  "",
+  "void main()",
+  "{",
+  "   gl_Position = aPosition;",
+  "   vColor = aColor;",
+  "}"
+].join("\n");
+
 var baseFragmentShader = [
-  "#if defined(GL_ES)",
   "precision mediump float;",
-  "#endif",
   "varying vec4 vColor;",
   "",
   "void main()",
@@ -213,28 +244,86 @@ var generateTestShader = function(
   return shader;
 };
 
-var runFeatureTest = function(params) {
-  if (window.initNonKhronosFramework) {
-    window.initNonKhronosFramework(false);
+function _reportResults(refData, refImg, testData, testImg, tolerance,
+                        width, height, ctx, imgData, wtu, canvas2d, consoleDiv) {
+  var same = true;
+  var firstFailure = null;
+  for (var yy = 0; yy < height; ++yy) {
+    for (var xx = 0; xx < width; ++xx) {
+      var offset = (yy * width + xx) * 4;
+      var imgOffset = ((height - yy - 1) * width + xx) * 4;
+      imgData.data[imgOffset + 0] = 0;
+      imgData.data[imgOffset + 1] = 0;
+      imgData.data[imgOffset + 2] = 0;
+      imgData.data[imgOffset + 3] = 255;
+      if (Math.abs(refData[offset + 0] - testData[offset + 0]) > tolerance ||
+          Math.abs(refData[offset + 1] - testData[offset + 1]) > tolerance ||
+          Math.abs(refData[offset + 2] - testData[offset + 2]) > tolerance ||
+          Math.abs(refData[offset + 3] - testData[offset + 3]) > tolerance) {
+        var detail = 'at (' + xx + ',' + yy + '): ref=(' +
+            refData[offset + 0] + ',' +
+            refData[offset + 1] + ',' +
+            refData[offset + 2] + ',' +
+            refData[offset + 3] + ')  test=(' +
+            testData[offset + 0] + ',' +
+            testData[offset + 1] + ',' +
+            testData[offset + 2] + ',' +
+            testData[offset + 3] + ') tolerance=' + tolerance;
+        consoleDiv.appendChild(document.createTextNode(detail));
+        consoleDiv.appendChild(document.createElement('br'));
+        if (!firstFailure) {
+          firstFailure = ": " + detail;
+        }
+        imgData.data[imgOffset] = 255;
+        same = false;
+      }
+    }
   }
 
+  var diffImg = null;
+  if (!same) {
+    ctx.putImageData(imgData, 0, 0);
+    diffImg = wtu.makeImageFromCanvas(canvas2d);
+  }
+
+  var div = document.createElement("div");
+  div.className = "testimages";
+  wtu.insertImage(div, "ref", refImg);
+  wtu.insertImage(div, "test", testImg);
+  if (diffImg) {
+    wtu.insertImage(div, "diff", diffImg);
+  }
+  div.appendChild(document.createElement('br'));
+
+  consoleDiv.appendChild(div);
+
+  if (!same) {
+    testFailed("images are different" + (firstFailure ? firstFailure : ""));
+  } else {
+    testPassed("images are the same");
+  }
+
+  consoleDiv.appendChild(document.createElement('hr'));
+}
+
+var runFeatureTest = function(params) {
   var wtu = WebGLTestUtils;
   var gridRes = params.gridRes;
   var vertexTolerance = params.tolerance || 0;
-  var fragmentTolerance = vertexTolerance;
+  var fragmentTolerance = params.tolerance || 1;
   if ('fragmentTolerance' in params)
-    fragmentTolerance = params.fragmentTolerance || 0;
+    fragmentTolerance = params.fragmentTolerance;
 
   description("Testing GLSL feature: " + params.feature);
 
   var width = 32;
   var height = 32;
 
-  var console = document.getElementById("console");
+  var consoleDiv = document.getElementById("console");
   var canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
-  var gl = wtu.create3DContext(canvas);
+  var gl = wtu.create3DContext(canvas, { premultipliedAlpha: false });
   if (!gl) {
     testFailed("context does not exist");
     finishTest();
@@ -282,7 +371,8 @@ var runFeatureTest = function(params) {
         type: type.type,
         arg0: type.type
       });
-      debug("Testing: " + str + " in " + shaderInfo.type + " shader");
+      var passMsg = "Testing: " + str + " in " + shaderInfo.type + " shader";
+      debug(passMsg);
 
       var referenceVertexShaderSource = generateReferenceShader(
           shaderInfo,
@@ -307,92 +397,71 @@ var runFeatureTest = function(params) {
           params,
           tests[ii]);
 
+
       debug("");
-      wtu.addShaderSource(
-          console, "reference vertex shader", referenceVertexShaderSource);
-      wtu.addShaderSource(
-          console, "reference fragment shader", referenceFragmentShaderSource);
-      wtu.addShaderSource(
-          console, "test vertex shader", testVertexShaderSource);
-      wtu.addShaderSource(
-          console, "test fragment shader", testFragmentShaderSource);
+      var referenceVertexShader = wtu.loadShader(gl, referenceVertexShaderSource, gl.VERTEX_SHADER, testFailed, true, 'reference');
+      var referenceFragmentShader = wtu.loadShader(gl, referenceFragmentShaderSource, gl.FRAGMENT_SHADER, testFailed, true, 'reference');
+      var testVertexShader = wtu.loadShader(gl, testVertexShaderSource, gl.VERTEX_SHADER, testFailed, true, 'test');
+      var testFragmentShader = wtu.loadShader(gl, testFragmentShaderSource, gl.FRAGMENT_SHADER, testFailed, true, 'test');
       debug("");
+
+      if (parseInt(wtu.getUrlOptions().dumpShaders)) {
+        var vRefInfo = {
+          shader: referenceVertexShader,
+          shaderSuccess: true,
+          label: "reference vertex shader",
+          source: referenceVertexShaderSource
+        };
+        var fRefInfo = {
+          shader: referenceFragmentShader,
+          shaderSuccess: true,
+          label: "reference fragment shader",
+          source: referenceFragmentShaderSource
+        };
+        wtu.dumpShadersInfo(gl, window.location.pathname, passMsg, vRefInfo, fRefInfo);
+
+        var vTestInfo = {
+          shader: testVertexShader,
+          shaderSuccess: true,
+          label: "test vertex shader",
+          source: testVertexShaderSource
+        };
+        var fTestInfo = {
+          shader: testFragmentShader,
+          shaderSuccess: true,
+          label: "test fragment shader",
+          source: testFragmentShaderSource
+        };
+        wtu.dumpShadersInfo(gl, window.location.pathname, passMsg, vTestInfo, fTestInfo);
+      }
 
       var refData = draw(
-          canvas, referenceVertexShaderSource, referenceFragmentShaderSource);
-      var refImg = wtu.makeImage(canvas);
+          referenceVertexShader, referenceFragmentShader);
+      var refImg = wtu.makeImageFromCanvas(canvas);
       if (ss == 0) {
         var testData = draw(
-            canvas, testVertexShaderSource, referenceFragmentShaderSource);
+            testVertexShader, referenceFragmentShader);
       } else {
         var testData = draw(
-            canvas, referenceVertexShaderSource, testFragmentShaderSource);
+            referenceVertexShader, testFragmentShader);
       }
-      var testImg = wtu.makeImage(canvas);
+      var testImg = wtu.makeImageFromCanvas(canvas);
 
-      reportResults(refData, refImg, testData, testImg, shaderInfo.tolerance);
+      _reportResults(refData, refImg, testData, testImg, shaderInfo.tolerance,
+                     width, height, ctx, imgData, wtu, canvas2d, consoleDiv);
     }
   }
 
   finishTest();
 
-  function reportResults(refData, refImage, testData, testImage, tolerance) {
-    var same = true;
-    for (var yy = 0; yy < height; ++yy) {
-      for (var xx = 0; xx < width; ++xx) {
-        var offset = (yy * width + xx) * 4;
-        var imgOffset = ((height - yy - 1) * width + xx) * 4;
-        imgData.data[imgOffset + 0] = 0;
-        imgData.data[imgOffset + 1] = 0;
-        imgData.data[imgOffset + 2] = 0;
-        imgData.data[imgOffset + 3] = 255;
-        if (Math.abs(refData[offset + 0] - testData[offset + 0]) > tolerance ||
-            Math.abs(refData[offset + 1] - testData[offset + 1]) > tolerance ||
-            Math.abs(refData[offset + 2] - testData[offset + 2]) > tolerance ||
-            Math.abs(refData[offset + 3] - testData[offset + 3]) > tolerance) {
-          imgData.data[imgOffset] = 255;
-          same = false;
-        }
-      }
-    }
-
-    var diffImg = null;
-    if (!same) {
-      ctx.putImageData(imgData, 0, 0);
-      diffImg = wtu.makeImage(canvas2d);
-    }
-
-    var div = document.createElement("div");
-    div.className = "testimages";
-    wtu.insertImage(div, "ref", refImg);
-    wtu.insertImage(div, "test", testImg);
-    if (diffImg) {
-      wtu.insertImage(div, "diff", diffImg);
-    }
-    div.appendChild(document.createElement('br'));
-
-
-    console.appendChild(div);
-
-    if (!same) {
-      testFailed("images are different");
-    } else {
-      testPassed("images are the same");
-    }
-
-    console.appendChild(document.createElement('hr'));
-  }
-
-  function draw(canvas, vsSource, fsSource) {
-    var program = wtu.loadProgram(gl, vsSource, fsSource, testFailed);
+  function draw(vertexShader, fragmentShader) {
+    var program = wtu.createProgram(gl, vertexShader, fragmentShader, testFailed);
 
     var posLoc = gl.getAttribLocation(program, "aPosition");
-    WebGLTestUtils.setupQuad(gl, gridRes, posLoc);
+    wtu.setupIndexedQuad(gl, gridRes, posLoc);
 
     gl.useProgram(program);
-    gl.clearColor(0, 0, 1, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    gl.drawElements(gl.TRIANGLES, gridRes * gridRes * 6, gl.UNSIGNED_SHORT, 0);
+    wtu.clearAndDrawIndexedQuad(gl, gridRes, [0, 0, 255, 255]);
     wtu.glErrorShouldBe(gl, gl.NO_ERROR, "no errors from draw");
 
     var img = new Uint8Array(width * height * 4);
@@ -403,10 +472,6 @@ var runFeatureTest = function(params) {
 };
 
 var runBasicTest = function(params) {
-  if (window.initNonKhronosFramework) {
-    window.initNonKhronosFramework(false);
-  }
-
   var wtu = WebGLTestUtils;
   var gridRes = params.gridRes;
   var vertexTolerance = params.tolerance || 0;
@@ -419,7 +484,7 @@ var runBasicTest = function(params) {
   var width = 32;
   var height = 32;
 
-  var console = document.getElementById("console");
+  var consoleDiv = document.getElementById("console");
   var canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -460,7 +525,8 @@ var runBasicTest = function(params) {
     for (var ii = 0; ii < tests.length; ++ii) {
       var test = tests[ii];
       debug("");
-      debug("Testing: " + test.name + " in " + shaderInfo.type + " shader");
+      var passMsg = "Testing: " + test.name + " in " + shaderInfo.type + " shader";
+      debug(passMsg);
 
       function genShader(shaderInfo, template, shader, subs) {
         shader = replaceParams(shader, subs, {
@@ -497,90 +563,66 @@ var runBasicTest = function(params) {
           test.test.subs);
 
       debug("");
-      wtu.addShaderSource(
-          console, "reference vertex shader", referenceVertexShaderSource);
-      wtu.addShaderSource(
-          console, "reference fragment shader", referenceFragmentShaderSource);
-      wtu.addShaderSource(
-          console, "test vertex shader", testVertexShaderSource);
-      wtu.addShaderSource(
-          console, "test fragment shader", testFragmentShaderSource);
+      var referenceVertexShader = wtu.loadShader(gl, referenceVertexShaderSource, gl.VERTEX_SHADER, testFailed, true, 'reference');
+      var referenceFragmentShader = wtu.loadShader(gl, referenceFragmentShaderSource, gl.FRAGMENT_SHADER, testFailed, true, 'reference');
+      var testVertexShader = wtu.loadShader(gl, testVertexShaderSource, gl.VERTEX_SHADER, testFailed, true, 'test');
+      var testFragmentShader = wtu.loadShader(gl, testFragmentShaderSource, gl.FRAGMENT_SHADER, testFailed, true, 'test');
       debug("");
 
-      var refData = draw(
-          canvas, referenceVertexShaderSource, referenceFragmentShaderSource);
-      var refImg = wtu.makeImage(canvas);
-      if (ss == 0) {
-        var testData = draw(
-            canvas, testVertexShaderSource, referenceFragmentShaderSource);
-      } else {
-        var testData = draw(
-            canvas, referenceVertexShaderSource, testFragmentShaderSource);
-      }
-      var testImg = wtu.makeImage(canvas);
+      if (parseInt(wtu.getUrlOptions().dumpShaders)) {
+        var vRefInfo = {
+          shader: referenceVertexShader,
+          shaderSuccess: true,
+          label: "reference vertex shader",
+          source: referenceVertexShaderSource
+        };
+        var fRefInfo = {
+          shader: referenceFragmentShader,
+          shaderSuccess: true,
+          label: "reference fragment shader",
+          source: referenceFragmentShaderSource
+        };
+        wtu.dumpShadersInfo(gl, window.location.pathname, passMsg, vRefInfo, fRefInfo);
 
-      reportResults(refData, refImg, testData, testImg, shaderInfo.tolerance);
+        var vTestInfo = {
+          shader: testVertexShader,
+          shaderSuccess: true,
+          label: "test vertex shader",
+          source: testVertexShaderSource
+        };
+        var fTestInfo = {
+          shader: testFragmentShader,
+          shaderSuccess: true,
+          label: "test fragment shader",
+          source: testFragmentShaderSource
+        };
+        wtu.dumpShadersInfo(gl, window.location.pathname, passMsg, vTestInfo, fTestInfo);
+      }
+
+      var refData = draw(referenceVertexShader, referenceFragmentShader);
+      var refImg = wtu.makeImageFromCanvas(canvas);
+      if (ss == 0) {
+        var testData = draw(testVertexShader, referenceFragmentShader);
+      } else {
+        var testData = draw(referenceVertexShader, testFragmentShader);
+      }
+      var testImg = wtu.makeImageFromCanvas(canvas);
+
+      _reportResults(refData, refImg, testData, testImg, shaderInfo.tolerance,
+                     width, height, ctx, imgData, wtu, canvas2d, consoleDiv);
     }
   }
 
   finishTest();
 
-  function reportResults(refData, refImage, testData, testImage, tolerance) {
-    var same = true;
-    for (var yy = 0; yy < height; ++yy) {
-      for (var xx = 0; xx < width; ++xx) {
-        var offset = (yy * width + xx) * 4;
-        var imgOffset = ((height - yy - 1) * width + xx) * 4;
-        imgData.data[imgOffset + 0] = 0;
-        imgData.data[imgOffset + 1] = 0;
-        imgData.data[imgOffset + 2] = 0;
-        imgData.data[imgOffset + 3] = 255;
-        if (Math.abs(refData[offset + 0] - testData[offset + 0]) > tolerance ||
-            Math.abs(refData[offset + 1] - testData[offset + 1]) > tolerance ||
-            Math.abs(refData[offset + 2] - testData[offset + 2]) > tolerance ||
-            Math.abs(refData[offset + 3] - testData[offset + 3]) > tolerance) {
-          imgData.data[imgOffset] = 255;
-          same = false;
-        }
-      }
-    }
-
-    var diffImg = null;
-    if (!same) {
-      ctx.putImageData(imgData, 0, 0);
-      diffImg = wtu.makeImage(canvas2d);
-    }
-
-    var div = document.createElement("div");
-    div.className = "testimages";
-    wtu.insertImage(div, "ref", refImg);
-    wtu.insertImage(div, "test", testImg);
-    if (diffImg) {
-      wtu.insertImage(div, "diff", diffImg);
-    }
-    div.appendChild(document.createElement('br'));
-
-    console.appendChild(div);
-
-    if (!same) {
-      testFailed("images are different");
-    } else {
-      testPassed("images are the same");
-    }
-
-    console.appendChild(document.createElement('hr'));
-  }
-
-  function draw(canvas, vsSource, fsSource) {
-    var program = wtu.loadProgram(gl, vsSource, fsSource, testFailed);
+  function draw(vertexShader, fragmentShader) {
+    var program = wtu.createProgram(gl, vertexShader, fragmentShader, testFailed);
 
     var posLoc = gl.getAttribLocation(program, "aPosition");
-    WebGLTestUtils.setupQuad(gl, gridRes, posLoc);
+    wtu.setupIndexedQuad(gl, gridRes, posLoc);
 
     gl.useProgram(program);
-    gl.clearColor(0, 0, 1, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    gl.drawElements(gl.TRIANGLES, gridRes * gridRes * 6, gl.UNSIGNED_SHORT, 0);
+    wtu.clearAndDrawIndexedQuad(gl, gridRes, [0, 0, 255, 255]);
     wtu.glErrorShouldBe(gl, gl.NO_ERROR, "no errors from draw");
 
     var img = new Uint8Array(width * height * 4);
@@ -591,10 +633,6 @@ var runBasicTest = function(params) {
 };
 
 var runReferenceImageTest = function(params) {
-  if (window.initNonKhronosFramework) {
-    window.initNonKhronosFramework(false);
-  }
-
   var wtu = WebGLTestUtils;
   var gridRes = params.gridRes;
   var vertexTolerance = params.tolerance || 0;
@@ -607,11 +645,11 @@ var runReferenceImageTest = function(params) {
   var width = 32;
   var height = 32;
 
-  var console = document.getElementById("console");
+  var consoleDiv = document.getElementById("console");
   var canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
-  var gl = wtu.create3DContext(canvas, { antialias: false });
+  var gl = wtu.create3DContext(canvas, { antialias: false, premultipliedAlpha: false });
   if (!gl) {
     testFailed("context does not exist");
     finishTest();
@@ -623,6 +661,18 @@ var runReferenceImageTest = function(params) {
   canvas2d.height = height;
   var ctx = canvas2d.getContext("2d");
   var imgData = ctx.getImageData(0, 0, width, height);
+
+  // State for reference images for vertex shader tests.
+  // These are drawn with the same tessellated grid as the test vertex
+  // shader so that the interpolation is identical. The grid is reused
+  // from test to test; the colors are changed.
+
+  var indexedQuadForReferenceVertexShader =
+    wtu.setupIndexedQuad(gl, gridRes, 0);
+  var referenceVertexShaderProgram =
+    wtu.setupProgram(gl, [ baseVertexShaderWithColor, baseFragmentShader ],
+                     ["aPosition", "aColor"]);
+  var referenceVertexShaderColorBuffer = gl.createBuffer();
 
   var shaderInfos = [
     { type: "vertex",
@@ -654,7 +704,8 @@ var runReferenceImageTest = function(params) {
         type: type.type,
         arg0: type.type
       });
-      debug("Testing: " + str + " in " + shaderInfo.type + " shader");
+      var passMsg = "Testing: " + str + " in " + shaderInfo.type + " shader";
+      debug(passMsg);
 
       var referenceVertexShaderSource = generateReferenceShader(
           shaderInfo,
@@ -678,7 +729,7 @@ var runReferenceImageTest = function(params) {
           shaderInfo.fragmentShaderTemplate,
           params,
           tests[ii].source);
-      var referenceTexture = generateReferenceTexture(
+      var referenceTextureOrArray = generateReferenceImage(
           gl,
           tests[ii].generator,
           isVertex ? gridRes : width,
@@ -686,100 +737,78 @@ var runReferenceImageTest = function(params) {
           isVertex);
 
       debug("");
-      wtu.addShaderSource(
-          console, "test vertex shader", testVertexShaderSource);
-      wtu.addShaderSource(
-          console, "test fragment shader", testFragmentShaderSource);
+      var testVertexShader = wtu.loadShader(gl, testVertexShaderSource, gl.VERTEX_SHADER, testFailed, true);
+      var testFragmentShader = wtu.loadShader(gl, testFragmentShaderSource, gl.FRAGMENT_SHADER, testFailed, true);
       debug("");
-      var refData = drawReferenceImage(canvas, referenceTexture, isVertex);
-      var refImg = wtu.makeImage(canvas);
-      if (isVertex) {
-        var testData = draw(
-            canvas, testVertexShaderSource, referenceFragmentShaderSource);
-      } else {
-        var testData = draw(
-            canvas, referenceVertexShaderSource, testFragmentShaderSource);
+
+
+      if (parseInt(wtu.getUrlOptions().dumpShaders)) {
+        var vRefInfo = {
+          shader: referenceVertexShader,
+          shaderSuccess: true,
+          label: "reference vertex shader",
+          source: referenceVertexShaderSource
+        };
+        var fRefInfo = {
+          shader: referenceFragmentShader,
+          shaderSuccess: true,
+          label: "reference fragment shader",
+          source: referenceFragmentShaderSource
+        };
+        wtu.dumpShadersInfo(gl, window.location.pathname, passMsg, vRefInfo, fRefInfo);
+
+        var vTestInfo = {
+          shader: testVertexShader,
+          shaderSuccess: true,
+          label: "test vertex shader",
+          source: testVertexShaderSource
+        };
+        var fTestInfo = {
+          shader: testFragmentShader,
+          shaderSuccess: true,
+          label: "test fragment shader",
+          source: testFragmentShaderSource
+        };
+        wtu.dumpShadersInfo(gl, window.location.pathname, passMsg, vTestInfo, fTestInfo);
       }
-      var testImg = wtu.makeImage(canvas);
+
+      var refData;
+      if (isVertex) {
+        refData = drawVertexReferenceImage(referenceTextureOrArray);
+      } else {
+        refData = drawFragmentReferenceImage(referenceTextureOrArray);
+      }
+      var refImg = wtu.makeImageFromCanvas(canvas);
+      var testData;
+      if (isVertex) {
+        var referenceFragmentShader = wtu.loadShader(gl, referenceFragmentShaderSource, gl.FRAGMENT_SHADER, testFailed);
+        testData = draw(
+          testVertexShader, referenceFragmentShader);
+      } else {
+        var referenceVertexShader = wtu.loadShader(gl, referenceVertexShaderSource, gl.VERTEX_SHADER, testFailed);
+        testData = draw(
+          referenceVertexShader, testFragmentShader);
+      }
+      var testImg = wtu.makeImageFromCanvas(canvas);
       var testTolerance = shaderInfo.tolerance;
       // Provide per-test tolerance so that we can increase it only for those desired.
       if ('tolerance' in tests[ii])
         testTolerance = tests[ii].tolerance || 0;
-      reportResults(refData, refImg, testData, testImg, testTolerance);
+      _reportResults(refData, refImg, testData, testImg, testTolerance,
+                     width, height, ctx, imgData, wtu, canvas2d, consoleDiv);
     }
   }
 
   finishTest();
 
-  function reportResults(refData, refImage, testData, testImage, tolerance) {
-    var same = true;
-    for (var yy = 0; yy < height; ++yy) {
-      for (var xx = 0; xx < width; ++xx) {
-        var offset = (yy * width + xx) * 4;
-        var imgOffset = ((height - yy - 1) * width + xx) * 4;
-        imgData.data[imgOffset + 0] = 0;
-        imgData.data[imgOffset + 1] = 0;
-        imgData.data[imgOffset + 2] = 0;
-        imgData.data[imgOffset + 3] = 255;
-        if (Math.abs(refData[offset + 0] - testData[offset + 0]) > tolerance ||
-            Math.abs(refData[offset + 1] - testData[offset + 1]) > tolerance ||
-            Math.abs(refData[offset + 2] - testData[offset + 2]) > tolerance ||
-            Math.abs(refData[offset + 3] - testData[offset + 3]) > tolerance) {
-          console.appendChild(document.createTextNode('at (' + xx + ',' + yy + '): ref=(' +
-                                                      refData[offset + 0] + ',' +
-                                                      refData[offset + 1] + ',' +
-                                                      refData[offset + 2] + ',' +
-                                                      refData[offset + 3] + ')  test=(' +
-                                                      testData[offset + 0] + ',' +
-                                                      testData[offset + 1] + ',' +
-                                                      testData[offset + 2] + ',' +
-                                                      testData[offset + 3] + ')'));
-          console.appendChild(document.createElement('br'));          
-
-
-
-          imgData.data[imgOffset] = 255;
-          same = false;
-        }
-      }
-    }
-
-    var diffImg = null;
-    if (!same) {
-      ctx.putImageData(imgData, 0, 0);
-      diffImg = wtu.makeImage(canvas2d);
-    }
-
-    var div = document.createElement("div");
-    div.className = "testimages";
-    wtu.insertImage(div, "ref", refImg);
-    wtu.insertImage(div, "test", testImg);
-    if (diffImg) {
-      wtu.insertImage(div, "diff", diffImg);
-    }
-    div.appendChild(document.createElement('br'));
-
-    console.appendChild(div);
-
-    if (!same) {
-      testFailed("images are different");
-    } else {
-      testPassed("images are the same");
-    }
-
-    console.appendChild(document.createElement('hr'));
-  }
-
-  function draw(canvas, vsSource, fsSource) {
-    var program = wtu.loadProgram(gl, vsSource, fsSource, testFailed);
+  function draw(vertexShader, fragmentShader) {
+    var program = wtu.createProgram(gl, vertexShader, fragmentShader, testFailed);
 
     var posLoc = gl.getAttribLocation(program, "aPosition");
-    WebGLTestUtils.setupQuad(gl, gridRes, posLoc);
+    wtu.setupIndexedQuad(gl, gridRes, posLoc);
 
     gl.useProgram(program);
-    gl.clearColor(0, 0, 1, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    gl.drawElements(gl.TRIANGLES, gridRes * gridRes * 6, gl.UNSIGNED_SHORT, 0);
+    wtu.clearAndDrawIndexedQuad(gl, gridRes, [0, 0, 255, 255]);
     wtu.glErrorShouldBe(gl, gl.NO_ERROR, "no errors from draw");
 
     var img = new Uint8Array(width * height * 4);
@@ -787,21 +816,34 @@ var runReferenceImageTest = function(params) {
     return img;
   }
 
-  function drawReferenceImage(canvas, texture, isVertex) {
-    var program;
-    if (isVertex) {
-      var halfTexel = 0.5 / (1.0 + gridRes);
-      program = WebGLTestUtils.setupTexturedQuadWithTexCoords(
-        gl, [halfTexel, halfTexel], [1.0 - halfTexel, 1.0 - halfTexel]);
-    } else {
-      program = WebGLTestUtils.setupTexturedQuad(gl);
-    }
+  function drawVertexReferenceImage(colors) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, indexedQuadForReferenceVertexShader[0]);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, referenceVertexShaderColorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, colors, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, true, 0, 0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexedQuadForReferenceVertexShader[1]);
+    gl.useProgram(referenceVertexShaderProgram);
+    wtu.clearAndDrawIndexedQuad(gl, gridRes);
+    gl.disableVertexAttribArray(0);
+    gl.disableVertexAttribArray(1);
+    wtu.glErrorShouldBe(gl, gl.NO_ERROR, "no errors from draw");
+
+    var img = new Uint8Array(width * height * 4);
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, img);
+    return img;
+  }
+
+  function drawFragmentReferenceImage(texture) {
+    var program = wtu.setupTexturedQuad(gl);
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
     var texLoc = gl.getUniformLocation(program, "tex");
     gl.uniform1i(texLoc, 0);
-    wtu.drawQuad(gl);
+    wtu.clearAndDrawUnitQuad(gl);
     wtu.glErrorShouldBe(gl, gl.NO_ERROR, "no errors from draw");
 
     var img = new Uint8Array(width * height * 4);
@@ -810,23 +852,23 @@ var runReferenceImageTest = function(params) {
   }
 
   /**
-   * Creates and returns a texture containing the reference image for
-   * the function being tested. Exactly how the function is evaluated,
-   * and the size of the returned texture, depends on whether we are
-   * testing a vertex or fragment shader. If a fragment shader, the
-   * function is evaluated at the pixel centers. If a vertex shader,
-   * the function is evaluated at the triangle's vertices, and the
-   * resulting texture must be offset by half a texel during
-   * rendering.
+   * Creates and returns either a Uint8Array (for vertex shaders) or
+   * WebGLTexture (for fragment shaders) containing the reference
+   * image for the function being tested. Exactly how the function is
+   * evaluated, and the size of the returned texture or array, depends on
+   * whether we are testing a vertex or fragment shader. If a fragment
+   * shader, the function is evaluated at the pixel centers. If a
+   * vertex shader, the function is evaluated at the triangle's
+   * vertices.
    *
    * @param {!WebGLRenderingContext} gl The WebGLRenderingContext to use to generate texture objects.
    * @param {!function(number,number,number,number): !Array.<number>} generator The reference image generator function.
    * @param {number} width The width of the texture to generate if testing a fragment shader; the grid resolution if testing a vertex shader.
    * @param {number} height The height of the texture to generate if testing a fragment shader; the grid resolution if testing a vertex shader.
    * @param {boolean} isVertex True if generating a reference image for a vertex shader; false if for a fragment shader.
-   * @return {!WebGLTexture} The texture object that was generated.
+   * @return {!WebGLTexture|!Uint8Array} The texture object or array that was generated.
    */
-  function generateReferenceTexture(
+  function generateReferenceImage(
     gl,
     generator,
     width,
@@ -839,11 +881,66 @@ var runReferenceImageTest = function(params) {
       return x * 0.5 + 0.5;
     }
 
-    function computeColor(texCoordX, texCoordY) {
+    function computeVertexColor(texCoordX, texCoordY) {
       return [ texCoordX,
                texCoordY,
                texCoordX * texCoordY,
                (1.0 - texCoordX) * texCoordY * 0.5 + 0.5 ];
+    }
+
+    /**
+     * Computes fragment color according to the algorithm used for interpolation
+     * in OpenGL (GLES 2.0 spec 3.5.1, OpenGL 4.3 spec 14.6.1).
+     */
+    function computeInterpolatedColor(texCoordX, texCoordY) {
+      // Calculate grid line indexes below and to the left from texCoord.
+      var gridBottom = Math.floor(texCoordY * gridRes);
+      if (gridBottom == gridRes) {
+        --gridBottom;
+      }
+      var gridLeft = Math.floor(texCoordX * gridRes);
+      if (gridLeft == gridRes) {
+        --gridLeft;
+      }
+
+      // Calculate coordinates relative to the grid cell.
+      var cellX = texCoordX * gridRes - gridLeft;
+      var cellY = texCoordY * gridRes - gridBottom;
+
+      // Barycentric coordinates inside either triangle ACD or ABC
+      // are used as weights for the vertex colors in the corners:
+      // A--B
+      // |\ |
+      // | \|
+      // D--C
+
+      var aColor = computeVertexColor(gridLeft / gridRes, (gridBottom + 1) / gridRes);
+      var bColor = computeVertexColor((gridLeft + 1) / gridRes, (gridBottom + 1) / gridRes);
+      var cColor = computeVertexColor((gridLeft + 1) / gridRes, gridBottom / gridRes);
+      var dColor = computeVertexColor(gridLeft / gridRes, gridBottom / gridRes);
+
+      // Calculate weights.
+      var a, b, c, d;
+
+      if (cellX + cellY < 1) {
+        // In bottom triangle ACD.
+        a = cellY; // area of triangle C-D-(cellX, cellY) relative to ACD
+        c = cellX; // area of triangle D-A-(cellX, cellY) relative to ACD
+        d = 1 - a - c;
+        b = 0;
+      } else {
+        // In top triangle ABC.
+        a = 1 - cellX; // area of the triangle B-C-(cellX, cellY) relative to ABC
+        c = 1 - cellY; // area of the triangle A-B-(cellX, cellY) relative to ABC
+        b = 1 - a - c;
+        d = 0;
+      }
+
+      var interpolated = [];
+      for (var ii = 0; ii < aColor.length; ++ii) {
+        interpolated.push(a * aColor[ii] + b * bColor[ii] + c * cColor[ii] + d * dColor[ii]);
+      }
+      return interpolated;
     }
 
     function clamp(value, minVal, maxVal) {
@@ -853,11 +950,11 @@ var runReferenceImageTest = function(params) {
     // Evaluates the function at clip coordinates (px,py), storing the
     // result in the array "pixel". Each channel's result is clamped
     // between 0 and 255.
-    function evaluateAtClipCoords(px, py, pixel) {
+    function evaluateAtClipCoords(px, py, pixel, colorFunc) {
       var tcx = computeTexCoord(px);
       var tcy = computeTexCoord(py);
 
-      var color = computeColor(tcx, tcy);
+      var color = colorFunc(tcx, tcy);
 
       var output = generator(color[0], color[1], color[2], color[3]);
 
@@ -869,7 +966,7 @@ var runReferenceImageTest = function(params) {
       pixel[3] = clamp(Math.round(256 * output[3]), 0, 255);
     }
 
-    function fillFragmentReference() {
+    function generateFragmentReference() {
       var data = new Uint8Array(4 * width * height);
 
       var horizTexel = 1.0 / width;
@@ -887,7 +984,7 @@ var runReferenceImageTest = function(params) {
           var px = -1.0 + 2.0 * (halfHorizTexel + xi * horizTexel);
           var py = -1.0 + 2.0 * (halfVertTexel + yi * vertTexel);
 
-          evaluateAtClipCoords(px, py, pixel);
+          evaluateAtClipCoords(px, py, pixel, computeInterpolatedColor);
           var index = 4 * (width * yi + xi);
           data[index + 0] = pixel[0];
           data[index + 1] = pixel[1];
@@ -896,12 +993,19 @@ var runReferenceImageTest = function(params) {
         }
       }
 
+      var texture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0,
                     gl.RGBA, gl.UNSIGNED_BYTE, data);
+      return texture;
     }
 
-    function fillVertexReference() {
-      // We generate a texture which contains the evaluation of the
+    function generateVertexReference() {
+      // We generate a Uint8Array which contains the evaluation of the
       // function at the vertices of the triangle mesh. It is expected
       // that the width and the height are identical, and equivalent
       // to the grid resolution.
@@ -924,7 +1028,7 @@ var runReferenceImageTest = function(params) {
           var px = -1.0 + (xi * step);
           var py = -1.0 + (yi * step);
 
-          evaluateAtClipCoords(px, py, pixel);
+          evaluateAtClipCoords(px, py, pixel, computeVertexColor);
           var index = 4 * (texSize * yi + xi);
           data[index + 0] = pixel[0];
           data[index + 1] = pixel[1];
@@ -933,28 +1037,18 @@ var runReferenceImageTest = function(params) {
         }
       }
 
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, texSize, texSize, 0,
-                    gl.RGBA, gl.UNSIGNED_BYTE, data);
+      return data;
     }
 
     //----------------------------------------------------------------------
-    // Body of generateReferenceTexture
+    // Body of generateReferenceImage
     //
 
-    var texture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
     if (isVertex) {
-      fillVertexReference();
+      return generateVertexReference();
     } else {
-      fillFragmentReference();
+      return generateFragmentReference();
     }
-
-    return texture;
   }
 };
 

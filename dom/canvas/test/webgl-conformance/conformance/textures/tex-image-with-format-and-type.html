@@ -1,8 +1,30 @@
 <!--
-Copyright (c) 2011 The Chromium Authors. All rights reserved.
-Use of this source code is governed by a BSD-style license that can be
-found in the LICENSE file.
- -->
+
+/*
+** Copyright (c) 2012 The Khronos Group Inc.
+**
+** Permission is hereby granted, free of charge, to any person obtaining a
+** copy of this software and/or associated documentation files (the
+** "Materials"), to deal in the Materials without restriction, including
+** without limitation the rights to use, copy, modify, merge, publish,
+** distribute, sublicense, and/or sell copies of the Materials, and to
+** permit persons to whom the Materials are furnished to do so, subject to
+** the following conditions:
+**
+** The above copyright notice and this permission notice shall be included
+** in all copies or substantial portions of the Materials.
+**
+** THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+** MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
+*/
+
+-->
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -10,10 +32,10 @@ found in the LICENSE file.
 <link rel="stylesheet" href="../../resources/js-test-style.css"/>
 <script src="../../resources/js-test-pre.js"></script>
 <script src="../resources/pnglib.js"></script>
-<script src="../resources/webgl-test.js"></script>
 <script src="../resources/webgl-test-utils.js"></script>
 
 <script>
+"use strict";
 var wtu = WebGLTestUtils;
 var gl = null;
 var textureLoc = null;
@@ -38,10 +60,6 @@ var DataMode = {
 
 function init()
 {
-    if (window.initNonKhronosFramework) {
-        window.initNonKhronosFramework(true);
-    }
-
     description('Verify texImage2D and texSubImage2D code paths taking both HTML and user-specified data with all format/type combinations');
 
     var canvas = document.getElementById("example");
@@ -424,7 +442,7 @@ function runOneTest(testCase)
     gl.deleteTexture(texture);
 
     // Read back the rendering results.
-    buf = new Uint8Array(testCase.width * testCase.height * 4);
+    var buf = new Uint8Array(testCase.width * testCase.height * 4);
     gl.readPixels(0, 0, testCase.width, testCase.height, gl.RGBA, gl.UNSIGNED_BYTE, buf);
     // Run the verification routine.
     if (testCase.verifier(buf, testCase.threshold, testCase.numOccurrences))
@@ -457,12 +475,11 @@ ImageWrapper.prototype.setPixel = function(x, y, r, g, b, a) {
 // Generates data into "data" property, possibly asynchronously.
 ImageWrapper.prototype.generateData = function() {
     var that = this;
-    var img = new Image();
-    img.onload = function() {
-        that.data = img;
-        maybeRunTests();
-    };
-    img.src = "data:image/png;base64," + this.pngBuilder_.getBase64();
+    var url = "data:image/png;base64," + this.pngBuilder_.getBase64();
+    var img = wtu.makeImage(url, function() {
+      that.data = img;
+      maybeRunTests();
+    });
 };
 
 function ImageDataWrapper(width, height)
@@ -719,7 +736,7 @@ function colorChannelsAreZero(array, threshold, numOccurrences) {
 </script>
 </head>
 <body onload="init()">
-<canvas id="example" width="256px" height="1px"></canvas>
+<canvas id="example" width="256" height="1"></canvas>
 <div id="description"></div>
 <div id="console"></div>
 </body>

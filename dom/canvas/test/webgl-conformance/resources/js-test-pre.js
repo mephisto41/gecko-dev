@@ -1,40 +1,71 @@
 /*
-Copyright (C) 2009 Apple Computer, Inc.  All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-1. Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
-2. Redistributions in binary form must reproduce the above copyright
-   notice, this list of conditions and the following disclaimer in the
-   documentation and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
-EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
-CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
-OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+** Copyright (c) 2012 The Khronos Group Inc.
+**
+** Permission is hereby granted, free of charge, to any person obtaining a
+** copy of this software and/or associated documentation files (the
+** "Materials"), to deal in the Materials without restriction, including
+** without limitation the rights to use, copy, modify, merge, publish,
+** distribute, sublicense, and/or sell copies of the Materials, and to
+** permit persons to whom the Materials are furnished to do so, subject to
+** the following conditions:
+**
+** The above copyright notice and this permission notice shall be included
+** in all copies or substantial portions of the Materials.
+**
+** THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+** MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
 */
 
-// WebKit Specfic code.  Add your own here.
-function initNonKhronosFramework(waitUntilDone) {
-  if (window.layoutTestController) {
-    layoutTestController.overridePreference("WebKitWebGLEnabled", "1");
-    layoutTestController.dumpAsText();
-    if (waitUntilDone) {
+(function() {
+  var testHarnessInitialized = false;
+
+  var initNonKhronosFramework = function() {
+    if (testHarnessInitialized) {
+      return;
+    }
+    testHarnessInitialized = true;
+
+    /* -- plaform specific code -- */
+
+    // WebKit Specific code. Add your code here.
+    if (window.testRunner && !window.layoutTestController) {
+      window.layoutTestController = window.testRunner;
+    }
+
+    if (window.layoutTestController) {
+      layoutTestController.overridePreference("WebKitWebGLEnabled", "1");
+      layoutTestController.dumpAsText();
       layoutTestController.waitUntilDone();
     }
+    if (window.internals) {
+      // The WebKit testing system compares console output.
+      // Because the output of the WebGL Tests is GPU dependent
+      // we turn off console messages.
+      window.console.log = function() { };
+      window.console.error = function() { };
+      window.internals.settings.setWebGLErrorsToConsoleEnabled(false);
+
+      // RAF doesn't work in LayoutTests. Disable it so the tests will
+      // use setTimeout instead.
+      window.requestAnimationFrame = undefined;
+      window.webkitRequestAnimationFrame = undefined;
+    }
+
+    /* -- end platform specific code --*/
   }
-}
+
+  this.initTestingHarness = function() {
+    initNonKhronosFramework();
+  }
+}());
 
 function nonKhronosFrameworkNotifyDone() {
+  // WebKit Specific code. Add your code here.
   if (window.layoutTestController) {
     layoutTestController.notifyDone();
   }
@@ -42,18 +73,38 @@ function nonKhronosFrameworkNotifyDone() {
 
 function reportTestResultsToHarness(success, msg) {
   if (window.parent.webglTestHarness) {
-    window.parent.webglTestHarness.reportResults(success, msg);
+    window.parent.webglTestHarness.reportResults(window.location.pathname, success, msg);
   }
 }
 
 function notifyFinishedToHarness() {
   if (window.parent.webglTestHarness) {
-    window.parent.webglTestHarness.notifyFinished();
+    window.parent.webglTestHarness.notifyFinished(window.location.pathname);
   }
+  if (window.nonKhronosFrameworkNotifyDone) {
+    window.nonKhronosFrameworkNotifyDone();
+  }
+}
+
+function _logToConsole(msg)
+{
+    if (window.console)
+      window.console.log(msg);
+}
+
+var _jsTestPreVerboseLogging = false;
+
+function enableJSTestPreVerboseLogging()
+{
+    _jsTestPreVerboseLogging = true;
 }
 
 function description(msg)
 {
+    initTestingHarness();
+    if (msg === undefined) {
+      msg = document.title;
+    }
     // For MSIE 6 compatibility
     var span = document.createElement("span");
     span.innerHTML = '<p>' + msg + '</p><p>On success, you will see a series of "<span class="pass">PASS</span>" messages, followed by "<span class="pass">TEST COMPLETE</span>".</p>';
@@ -62,13 +113,24 @@ function description(msg)
         description.replaceChild(span, description.firstChild);
     else
         description.appendChild(span);
+    if (_jsTestPreVerboseLogging) {
+        _logToConsole(msg);
+    }
+}
+
+function _addSpan(contents)
+{
+    var span = document.createElement("span");
+    document.getElementById("console").appendChild(span); // insert it first so XHTML knows the namespace
+    span.innerHTML = contents + '<br />';
 }
 
 function debug(msg)
 {
-    var span = document.createElement("span");
-    document.getElementById("console").appendChild(span); // insert it first so XHTML knows the namespace
-    span.innerHTML = msg + '<br />';
+    _addSpan(msg);
+    if (_jsTestPreVerboseLogging) {
+	_logToConsole(msg);
+    }
 }
 
 function escapeHTML(text)
@@ -79,84 +141,17 @@ function escapeHTML(text)
 function testPassed(msg)
 {
     reportTestResultsToHarness(true, msg);
-    debug('<span><span class="pass">PASS</span> ' + escapeHTML(msg) + '</span>');
+    _addSpan('<span><span class="pass">PASS</span> ' + escapeHTML(msg) + '</span>');
+    if (_jsTestPreVerboseLogging) {
+	_logToConsole('PASS ' + msg);
+    }
 }
 
 function testFailed(msg)
 {
     reportTestResultsToHarness(false, msg);
-    debug('<span><span class="fail">FAIL</span> ' + escapeHTML(msg) + '</span>');
-    dump('FAIL: ' + msg + '\n');
-
-    var stack = (new Error).stack.split('\n');
-    if (!stack.length) {
-        return;
-    }
-
-    dump('STACK TRACE: \n');
-
-    stack.pop();
-    var index = 0, frame, messages = new Array();
-    // Match all .html files and print out the line in them.
-    while (stack.length && index != -1) {
-        frame = stack.pop();
-        index = frame.indexOf(".html:");
-        if (index != -1) {
-            messages.unshift(frame);
-        }
-    }
-
-    // Print out the first stack frame in JS and then stop.
-    if (stack.length) {
-        messages.unshift(stack.pop());
-    }
-
-    for (message in messages) {
-        dump(messages[message] + '\n');
-    }
-}
-
-function testFailedRender(msg, ref, test, width, height)
-{
-    var refData;
-    if (typeof ref.getImageData == 'function') {
-        refData = ref.canvas.toDataURL();
-    } else {
-        refData = arrayToURLData(ref, width, height);
-    }
-
-    var testData;
-    if (typeof test.getImageData == 'function') {
-        testData = test.canvas.toDataURL();
-    } else {
-        testData = arrayToURLData(test, width, height);
-    }
-
-    testFailed(msg);
-
-    var data = 'REFTEST TEST-DEBUG-INFO | ' + msg + ' | image comparison (==)\n' +
-               'REFTEST   IMAGE 1 (TEST): ' + testData + '\n' +
-               'REFTEST   IMAGE 2 (REFERENCE): ' + refData;
-    dump('FAIL: ' + data + '\n');
-    dump('To view the differences between these image renderings, go to the following link: https://hg.mozilla.org/mozilla-central/raw-file/tip/layout/tools/reftest/reftest-analyzer.xhtml#log=' +
-    encodeURIComponent(encodeURIComponent(data)) + '\n');
-}
-
-function arrayToURLData(buf, width, height)
-{
-    var cv = document.createElement('canvas');
-    cv.height = height;
-    cv.width = width;
-    var ctx = cv.getContext('2d');
-    var imgd = ctx.getImageData(0, 0, width, height);
-    for (i = 0; i < height * width; ++i) {
-        offset = i * 4;
-        for (j = 0; j < 4; j++) {
-            imgd.data[offset + j] = buf[offset + j];
-        }
-    }
-    ctx.putImageData(imgd, 0, 0);
-    return cv.toDataURL();
+    _addSpan('<span><span class="fail">FAIL</span> ' + escapeHTML(msg) + '</span>');
+    _logToConsole('FAIL ' + msg);
 }
 
 function areArraysEqual(_a, _b)
@@ -406,6 +401,14 @@ function shouldBeGreaterThanOrEqual(_a, _b) {
         testPassed(_a + " is >= " + _b);
 }
 
+function expectTrue(v, msg) {
+  if (v) {
+    testPassed(msg);
+  } else {
+    testFailed(msg);
+  }
+}
+
 function shouldThrow(_a, _e)
 {
   var exception;
@@ -429,6 +432,35 @@ function shouldThrow(_a, _e)
     testFailed(_a + " should throw " + (typeof _e == "undefined" ? "an exception" : _ev) + ". Was undefined.");
   else
     testFailed(_a + " should throw " + (typeof _e == "undefined" ? "an exception" : _ev) + ". Was " + _av + ".");
+}
+
+function shouldBeType(_a, _type) {
+    var exception;
+    var _av;
+    try {
+        _av = eval(_a);
+    } catch (e) {
+        exception = e;
+    }
+
+    var _typev = eval(_type);
+
+    if(_typev === Number){
+        if(_av instanceof Number){
+            testPassed(_a + " is an instance of Number");
+        }
+        else if(typeof(_av) === 'number'){
+            testPassed(_a + " is an instance of Number");
+        }
+        else{
+            testFailed(_a + " is not an instance of Number");
+        }
+    }
+    else if (_av instanceof _typev) {
+        testPassed(_a + " is an instance of " + _type);
+    } else {
+        testFailed(_a + " is not an instance of " + _type);
+    }
 }
 
 function assertMsg(assertion, msg) {
@@ -469,6 +501,20 @@ function gc() {
 }
 
 function finishTest() {
-    debug('<br /><span class="pass">TEST COMPLETE</span>');
-    notifyFinishedToHarness();
+  successfullyParsed = true;
+  var epilogue = document.createElement("script");
+  var basePath = "";
+  var expectedBase = "js-test-pre.js";
+  var scripts = document.getElementsByTagName('script');
+  for (var script, i = 0; script = scripts[i]; i++) {
+    var src = script.src;
+    var l = src.length;
+    if (src.substr(l - expectedBase.length) == expectedBase) {
+      basePath = src.substr(0, l - expectedBase.length);
+      break;
+    }
+  }
+  epilogue.src = basePath + "js-test-post.js";
+  document.body.appendChild(epilogue);
 }
+

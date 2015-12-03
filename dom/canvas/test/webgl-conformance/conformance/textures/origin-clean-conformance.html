@@ -1,31 +1,41 @@
 <!--
-Copyright (c) 2011 The Chromium Authors. All rights reserved.
-Use of this source code is governed by a BSD-style license that can be
-found in the LICENSE file.
+
+/*
+** Copyright (c) 2012 The Khronos Group Inc.
+**
+** Permission is hereby granted, free of charge, to any person obtaining a
+** copy of this software and/or associated documentation files (the
+** "Materials"), to deal in the Materials without restriction, including
+** without limitation the rights to use, copy, modify, merge, publish,
+** distribute, sublicense, and/or sell copies of the Materials, and to
+** permit persons to whom the Materials are furnished to do so, subject to
+** the following conditions:
+**
+** The above copyright notice and this permission notice shall be included
+** in all copies or substantial portions of the Materials.
+**
+** THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+** MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
+*/
+
 -->
+
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <title>WebGL Origin Restrictions Conformance Tests</title>
 <link rel="stylesheet" href="../../resources/js-test-style.css"/>
-<script src="../../resources/desktop-gl-constants.js" type="text/javascript"></script>
 <script src="../../resources/js-test-pre.js"></script>
-<script src="../../resources/cors-util.js"></script>
-<script src="../resources/webgl-test.js"></script>
+<script src="../resources/webgl-test-utils.js"></script>
 <script>
-// This function returns the last 2 words of the domain of a URL
-// This is probably not the correct check but it will do for now.
-function getBaseDomain(str) {
-  str = str.replace("\\", "/");
-  var pos = str.indexOf("://");
-  if (pos >= 0) {
-    str = str.substr(pos + 3);
-  }
-  var parts = str.split('/');
-  var domain = parts[0].match(/\w+\.\w+$/);
-  return domain || '';
-}
+"use strict";
+var wtu = WebGLTestUtils;
 
 // Checks if function throws an exception.
 function causedException(func) {
@@ -38,14 +48,20 @@ function causedException(func) {
   return hadException;
 }
 
-function onImageLoad() {
-  description("This test ensures WebGL implementations follow proper same-origin restrictions.");
-  var img = document.getElementById("img");
-  assertMsg(img.width > 0 && img.height > 0,
-            "Image should have loaded properly: " + img.src);
+var defaultImgUrl = "http://www.opengl.org/img/opengl_logo.jpg";
+var localImgUrl = "../resources/opengl_logo.jpg";
 
-  imgDomain = getBaseDomain(img.src);
-  pageDomain = getBaseDomain(window.location.toString());
+var imgDomain;
+var pageDomain;
+var successfullyParsed;
+
+function imageLoaded() {
+  description("This test ensures WebGL implementations follow proper same-origin restrictions.");
+  var img = this;
+
+  assertMsg(img.width > 0 && img.height > 0, "img was loaded");
+  imgDomain = wtu.getBaseDomain(wtu.getHost(img.src));
+  pageDomain = wtu.getBaseDomain(window.location.host);
   assertMsg(imgDomain != pageDomain,
             "img domain (" + imgDomain + ") and page domain (" + pageDomain + ") are not the same.");
 
@@ -75,7 +91,7 @@ function onImageLoad() {
   }
 
   var canvas1 = document.getElementById("canvas1");
-  var gl = create3DContext(canvas1);
+  var gl = wtu.create3DContext(canvas1);
 
   debug("");
   debug("check that an attempt to upload an image from another origin throws an exception.");
@@ -119,6 +135,8 @@ function onImageLoad() {
   debug('<br /><span class="pass">TEST COMPLETE</span>');
   notifyFinishedToHarness();
 }
+
+wtu.setupImageForCrossOriginTest("#img", defaultImgUrl, localImgUrl, imageLoaded);
 </script>
 </head>
 <body>
@@ -127,10 +145,5 @@ function onImageLoad() {
 <canvas id="canvas1"></canvas>
 <canvas id="canvas2"></canvas>
 <img id="img" style="display:none;">
-<script>
-var imagePath = 'resources/opengl_logo.jpg';
-var relPathToBase = '../../';
-setExampleDotComImage('img', imagePath, relPathToBase, onImageLoad);
-</script>
 </body>
 </html>

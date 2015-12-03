@@ -1,8 +1,30 @@
 <!--
-Copyright (c) 2011 The Chromium Authors. All rights reserved.
-Use of this source code is governed by a BSD-style license that can be
-found in the LICENSE file.
- -->
+
+/*
+** Copyright (c) 2012 The Khronos Group Inc.
+**
+** Permission is hereby granted, free of charge, to any person obtaining a
+** copy of this software and/or associated documentation files (the
+** "Materials"), to deal in the Materials without restriction, including
+** without limitation the rights to use, copy, modify, merge, publish,
+** distribute, sublicense, and/or sell copies of the Materials, and to
+** permit persons to whom the Materials are furnished to do so, subject to
+** the following conditions:
+**
+** The above copyright notice and this permission notice shall be included
+** in all copies or substantial portions of the Materials.
+**
+** THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+** MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
+*/
+
+-->
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -10,7 +32,6 @@ found in the LICENSE file.
 <title>WebGL texture size cube map conformance test.</title>
 <link rel="stylesheet" href="../../resources/js-test-style.css"/>
 <script src="../../resources/js-test-pre.js"></script>
-<script src="../resources/webgl-test.js"> </script>
 <script src="../resources/webgl-test-utils.js"></script>
 </head>
 <body>
@@ -39,14 +60,15 @@ void main()
 }
 </script>
 <script>
+"use strict";
 var canvas;
 description("Checks issues with size of cube map textures");
 debug("");
 
 var wtu = WebGLTestUtils;
-canvas = document.getElementById("example");
+var canvas = document.getElementById("example");
 
-gl = wtu.create3DContext(canvas);
+var gl = wtu.create3DContext(canvas);
 wtu.setupUnitQuad(gl, 0, 1);
 var program = wtu.setupProgram(
     gl,
@@ -112,7 +134,7 @@ function test() {
     finishTest();
   } else {
     ++sizeCount;
-    setTimeout(test, 100);
+    setTimeout(test, 0);
   }
 }
 
@@ -161,7 +183,7 @@ function testSize(size) {
       var color = colors[(rr + count) % colors.length];
       var rotMat = axisRotation(rot.axis, rot.angle);
       gl.uniformMatrix4fv(rotLoc, false, rotMat);
-      wtu.drawQuad(gl);
+      wtu.clearAndDrawUnitQuad(gl);
       wtu.checkCanvas(
           gl, color.color,
           wtu.glEnumToString(gl, targets[rr]) + " should be " + color.name);
@@ -176,7 +198,7 @@ function testSize(size) {
         var rotMat = mulMatrix(tmpMat, rotMat);
       }
       gl.uniformMatrix4fv(rotLoc, false, rotMat);
-      wtu.drawQuad(gl);
+      wtu.clearAndDrawUnitQuad(gl);
 
       for (var ii = 0; ii < 2; ++ii) {
         checkRect(
@@ -194,7 +216,7 @@ function testSize(size) {
   return true;
 }
 
-glErrorShouldBe(gl, gl.NO_ERROR, "Should be no errors.");
+wtu.glErrorShouldBe(gl, gl.NO_ERROR, "Should be no errors.");
 
 function checkRect(x, y, width, height, color) {
   wtu.checkCanvasRect(
@@ -324,7 +346,7 @@ function mulMatrix(a, b) {
   return dst;
 };
 
-successfullyParsed = true;
+var successfullyParsed = true;
 </script>
 </body>
 </html>

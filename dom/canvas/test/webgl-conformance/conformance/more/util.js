@@ -1,28 +1,28 @@
 /*
 Utilities for the OpenGL ES 2.0 HTML Canvas context
+*/
 
-Copyright (C) 2011  Ilmari Heikkinen <ilmari.heikkinen@gmail.com>
-
-Permission is hereby granted, free of charge, to any person
-obtaining a copy of this software and associated documentation
-files (the "Software"), to deal in the Software without
-restriction, including without limitation the rights to use,
-copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following
-conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
+/*
+** Copyright (c) 2012 The Khronos Group Inc.
+**
+** Permission is hereby granted, free of charge, to any person obtaining a
+** copy of this software and/or associated documentation files (the
+** "Materials"), to deal in the Materials without restriction, including
+** without limitation the rights to use, copy, modify, merge, publish,
+** distribute, sublicense, and/or sell copies of the Materials, and to
+** permit persons to whom the Materials are furnished to do so, subject to
+** the following conditions:
+**
+** The above copyright notice and this permission notice shall be included
+** in all copies or substantial portions of the Materials.
+**
+** THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+** MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
 */
 
 function loadTexture(gl, elem, mipmaps) {
@@ -841,7 +841,7 @@ VBO.prototype = {
     if (!this.initialized) this.init();
     var gl = this.gl;
     for (var i=0; i<arguments.length; i++) {
-      if (arguments[i] == null) continue;
+      if (arguments[i] == null || arguments[i] == -1) continue;
       gl.bindBuffer(gl.ARRAY_BUFFER, this.vbos[i]);
       gl.vertexAttribPointer(arguments[i], this.data[i].size, gl.FLOAT, false, 0, 0);
       gl.enableVertexAttribArray(arguments[i]);
@@ -998,11 +998,16 @@ function wrapGLContext(gl) {
   return wrap;
 }
 
+function getGLContext(canvas) {
+  return canvas.getContext(GL_CONTEXT_ID, {antialias: false});
+}
+
 // Assert that f generates a specific GL error.
 function assertGLError(gl, err, name, f) {
   if (f == null) { f = name; name = null; }
+  var r = false;
   var glErr = 0;
-  try { f(); } catch(e) { glErr = e.glError; }
+  try { f(); } catch(e) { r=true; glErr = e.glError; }
   if (glErr !== err) {
     if (glErr === undefined) {
       testFailed("assertGLError: UNEXPECTED EXCEPTION", name, f);
@@ -1015,40 +1020,6 @@ function assertGLError(gl, err, name, f) {
   return true;
 }
 
-// Assert that f generates a specific GL error.
-function assertGLErrorIn(gl, expectedErrorList, name, f) {
-  if (f == null) { f = name; name = null; }
-
-  var actualError = 0;
-  try {
-    f();
-  } catch(e) {
-    if ('glError' in e) {
-      actualError = e.glError;
-    } else {
-      testFailed("assertGLErrorIn: UNEXPECTED EXCEPTION", name, f);
-      return false;
-    }
-  }
-
-  var expectedErrorStrList = [];
-  var expectedErrorSet = {};
-  for (var i in expectedErrorList) {
-    var cur = expectedErrorList[i];
-    expectedErrorSet[cur] = true;
-    expectedErrorStrList.push(getGLErrorAsString(gl, cur));
-  }
-  var expectedErrorListStr = "[" + expectedErrorStrList.join(", ") + "]";
-
-  if (actualError in expectedErrorSet) {
-    return true;
-  }
-
-  testFailed("assertGLErrorIn: expected: " + expectedErrorListStr +
-             " actual: " + getGLErrorAsString(gl, actualError), name, f);
-  return false;
-}
-
 // Assert that f generates some GL error. Used in situations where it's
 // ambigious which of multiple possible errors will be generated.
 function assertSomeGLError(gl, name, f) {
@@ -1059,7 +1030,7 @@ function assertSomeGLError(gl, name, f) {
   try { f(); } catch(e) { r=true; glErr = e.glError; }
   if (glErr === 0) {
     if (glErr === undefined) {
-      testFailed("assertGLError: UNEXPCETED EXCEPTION", name, f);
+      testFailed("assertGLError: UNEXPECTED EXCEPTION", name, f);
     } else {
       testFailed("assertGLError: expected: " + getGLErrorAsString(gl, err) +
                  " actual: " + getGLErrorAsString(gl, glErr), name, f);

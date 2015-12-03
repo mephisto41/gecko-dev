@@ -1,26 +1,44 @@
 <!--
-Copyright (c) 2011 The Chromium Authors. All rights reserved.
-Use of this source code is governed by a BSD-style license that can be
-found in the LICENSE file.
- -->
+
+/*
+** Copyright (c) 2012 The Khronos Group Inc.
+**
+** Permission is hereby granted, free of charge, to any person obtaining a
+** copy of this software and/or associated documentation files (the
+** "Materials"), to deal in the Materials without restriction, including
+** without limitation the rights to use, copy, modify, merge, publish,
+** distribute, sublicense, and/or sell copies of the Materials, and to
+** permit persons to whom the Materials are furnished to do so, subject to
+** the following conditions:
+**
+** The above copyright notice and this permission notice shall be included
+** in all copies or substantial portions of the Materials.
+**
+** THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+** MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
+*/
+
+-->
+
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <link rel="stylesheet" href="../../resources/js-test-style.css"/>
 <script src="../../resources/js-test-pre.js"></script>
-<script src="../resources/webgl-test.js"></script>
 <script src="../resources/webgl-test-utils.js"></script>
 
 <script>
+"use strict";
 var successfullyParsed = false;
 
 function init()
 {
-    if (window.initNonKhronosFramework) {
-        window.initNonKhronosFramework(true);
-    }
-
     description('Verify copyTexImage2D and copyTexSubImage2D');
 
     runTest();
@@ -33,11 +51,11 @@ function runTestIteration(antialias)
 {
     var canvas = document.getElementById(
         antialias ? "antialiasOn" : "antialiasOff");
-    var attribs = antialias ? { antialias: false } : undefined;
+    var attribs = antialias ? { antialias: true } : { antialias: false };
     gl = wtu.create3DContext(canvas, attribs);
     var program = wtu.setupTexturedQuad(gl);
     var textureLoc = gl.getUniformLocation(program, "tex");
-    glErrorShouldBe(gl, gl.NO_ERROR, "During Initialization");
+    wtu.glErrorShouldBe(gl, gl.NO_ERROR, "During Initialization");
 
     gl.colorMask(1, 1, 1, 1);
     gl.disable(gl.BLEND);
@@ -76,13 +94,13 @@ function runTestIteration(antialias)
           switch (ii) {
           case 0:
             gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, xx, yy, 2, 2, 0);
-            glErrorShouldBe(gl, gl.NO_ERROR,
-                "using copyTexImage2D: x =" + xx + ", y = " + yy);
+            wtu.glErrorShouldBe(gl, gl.NO_ERROR,
+                "using copyTexImage2D: x = " + xx + ", y = " + yy);
             break;
           case 1:
             gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, xx, yy, 2, 2);
-            glErrorShouldBe(gl, gl.NO_ERROR,
-                "using copyTexSubImage2D: x =" + xx + ", y = " + yy);
+            wtu.glErrorShouldBe(gl, gl.NO_ERROR,
+                "using copyTexSubImage2D: x = " + xx + ", y = " + yy);
             break;
           }
 
@@ -91,7 +109,7 @@ function runTestIteration(antialias)
           gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
           // Draw the triangles
-          wtu.drawQuad(gl);
+          wtu.clearAndDrawUnitQuad(gl);
 
           // check the rendering results
           for (var iy = 0; iy < 2; ++iy) {
@@ -128,8 +146,8 @@ function runTest(antialias)
 </script>
 </head>
 <body onload="init()">
-<canvas id="antialiasOn" width="2px" height="2px"></canvas>
-<canvas id="antialiasOff" width="2px" height="2px"></canvas>
+<canvas id="antialiasOn" width="2" height="2"></canvas>
+<canvas id="antialiasOff" width="2" height="2"></canvas>
 <div id="description"></div>
 <div id="console"></div>
 </body>

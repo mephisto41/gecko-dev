@@ -1,8 +1,30 @@
 <!--
-Copyright (c) 2011 The Chromium Authors. All rights reserved.
-Use of this source code is governed by a BSD-style license that can be
-found in the LICENSE file.
- -->
+
+/*
+** Copyright (c) 2012 The Khronos Group Inc.
+**
+** Permission is hereby granted, free of charge, to any person obtaining a
+** copy of this software and/or associated documentation files (the
+** "Materials"), to deal in the Materials without restriction, including
+** without limitation the rights to use, copy, modify, merge, publish,
+** distribute, sublicense, and/or sell copies of the Materials, and to
+** permit persons to whom the Materials are furnished to do so, subject to
+** the following conditions:
+**
+** The above copyright notice and this permission notice shall be included
+** in all copies or substantial portions of the Materials.
+**
+** THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+** MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
+*/
+
+-->
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -10,7 +32,6 @@ found in the LICENSE file.
   <title>gl-pointcoord Test</title>
   <link rel="stylesheet" href="../../../resources/js-test-style.css"/>
   <script src="../../../resources/js-test-pre.js"></script>
-  <script src="../../resources/webgl-test.js"> </script>
   <script src="../../resources/webgl-test-utils.js"> </script>
 </head>
 <body>
@@ -41,18 +62,16 @@ found in the LICENSE file.
   </script>
 
   <script>
-    if (window.initNonKhronosFramework) {
-      window.initNonKhronosFramework(false);
-    }
-
+    "use strict";
     description("Checks gl_PointCoord and gl_PointSize");
     debug("");
 
     // NOTE: I'm not 100% confident in this test. I think it is correct.
 
-    wtu = WebGLTestUtils;
-    var gl = initWebGL("example", "vshader", "fshader", [ "vPosition"], [ 0, 0, 0, 1 ], 1);
+    var wtu = WebGLTestUtils;
+    var gl = wtu.create3DContext("example");
     shouldBeNonNull("gl");
+    var program = wtu.setupProgram(gl, ["vshader", "fshader"], ["vPosition"]);
     shouldBe("gl.getError()", "gl.NO_ERROR");
 
     var canvas = gl.canvas;
@@ -62,6 +81,9 @@ found in the LICENSE file.
 
     var maxPointSize = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1];
     shouldBeTrue("maxPointSize >= 1");
+    // The minimum and maximum point sizes may be floating-point numbers.
+    shouldBeTrue("Math.floor(maxPointSize) >= 1");
+    maxPointSize = Math.floor(maxPointSize);
     shouldBeTrue("maxPointSize % 1 == 0");
 
     maxPointSize = Math.min(maxPointSize, 64);
@@ -69,7 +91,6 @@ found in the LICENSE file.
     var pointStep = Math.floor(maxPointSize / 4);
     var pointStep = Math.max(1, pointStep);
 
-    var program = gl.program;
     var pointSizeLoc = gl.getUniformLocation(program, "uPointSize");
     gl.uniform1f(pointSizeLoc, maxPointSize);
 
@@ -133,9 +154,9 @@ found in the LICENSE file.
       }
     }
 
-    successfullyParsed = true;
+    var successfullyParsed = true;
   </script>
-  <script>finishTest();</script>
+  <script src="../../../resources/js-test-post.js"></script>
 
 </body>
 </html>

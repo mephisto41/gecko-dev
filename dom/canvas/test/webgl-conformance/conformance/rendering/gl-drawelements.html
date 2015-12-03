@@ -1,8 +1,30 @@
 <!--
-Copyright (c) 2011 The Chromium Authors. All rights reserved.
-Use of this source code is governed by a BSD-style license that can be
-found in the LICENSE file.
+
+/*
+** Copyright (c) 2012 The Khronos Group Inc.
+**
+** Permission is hereby granted, free of charge, to any person obtaining a
+** copy of this software and/or associated documentation files (the
+** "Materials"), to deal in the Materials without restriction, including
+** without limitation the rights to use, copy, modify, merge, publish,
+** distribute, sublicense, and/or sell copies of the Materials, and to
+** permit persons to whom the Materials are furnished to do so, subject to
+** the following conditions:
+**
+** The above copyright notice and this permission notice shall be included
+** in all copies or substantial portions of the Materials.
+**
+** THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+** MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
+*/
+
 -->
+
 <!DOCTYPE html>
 <html>
   <head>
@@ -10,7 +32,7 @@ found in the LICENSE file.
     <title>WebGL drawElements Test</title>
     <link rel="stylesheet" href="../../resources/js-test-style.css"/>
     <script src="../../resources/js-test-pre.js"></script>
-    <script src="../resources/webgl-test.js"> </script>
+    <script src="../resources/webgl-test-utils.js"> </script>
     <script src="../../resources/desktop-gl-constants.js" type="text/javascript"></script>
 </head>
 <body>
@@ -33,21 +55,20 @@ found in the LICENSE file.
     </script>
 
     <script>
+        "use strict";
         function init()
         {
-            if (window.initNonKhronosFramework) {
-                window.initNonKhronosFramework(false);
-            }
-
             description(document.title);
 
             function checkDrawElements(mode, count, type, expect, msg) {
               gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
               gl.drawElements(mode, count, type, 0);
-              glErrorShouldBe(gl, expect, msg);
+              wtu.glErrorShouldBe(gl, expect, msg);
             }
 
-            gl = initWebGL("example", "vshader", "fshader", [ "vPosition"], [ 0, 0, 0, 1 ], 1);
+            var wtu = WebGLTestUtils;
+            var gl = wtu.create3DContext("example");
+            var program = wtu.setupProgram(gl, ["vshader", "fshader"], ["vPosition"]);
 
             var vertexObject = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, vertexObject);
@@ -86,13 +107,19 @@ found in the LICENSE file.
             checkDrawElements(
                 gl.TRIANGLES, 3, gl.UNSIGNED_INT,
                 gl.INVALID_ENUM, "gl.DrawElements should return INVALID_ENUM with UNSIGNED_INT");
+            checkDrawElements(
+                gl.TRIANGLES, 3, gl.FLOAT,
+                gl.INVALID_ENUM, "gl.DrawElements should return INVALID_ENUM with FLOAT");
+            checkDrawElements(
+                gl.TRIANGLES, 3, gl.SHORT,
+                gl.INVALID_ENUM, "gl.DrawElements should return INVALID_ENUM with SHORT");
 
        }
 
        init();
-       successfullyParsed = true;
+       var successfullyParsed = true;
     </script>
-<script>finishTest();</script>
+<script src="../../resources/js-test-post.js"></script>
 
 </body>
 </html>

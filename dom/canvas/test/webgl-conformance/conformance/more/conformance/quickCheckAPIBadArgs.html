@@ -1,6 +1,33 @@
 <!DOCTYPE html>
-<html><head>
+<html>
+<head>
 <meta charset="utf-8">
+<!--
+
+/*
+** Copyright (c) 2012 The Khronos Group Inc.
+**
+** Permission is hereby granted, free of charge, to any person obtaining a
+** copy of this software and/or associated documentation files (the
+** "Materials"), to deal in the Materials without restriction, including
+** without limitation the rights to use, copy, modify, merge, publish,
+** distribute, sublicense, and/or sell copies of the Materials, and to
+** permit persons to whom the Materials are furnished to do so, subject to
+** the following conditions:
+**
+** The above copyright notice and this permission notice shall be included
+** in all copies or substantial portions of the Materials.
+**
+** THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+** MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
+*/
+
+-->
 <link rel="stylesheet" type="text/css" href="../unit.css" />
 <script type="application/x-javascript" src="../unit.js"></script>
 <script type="application/x-javascript" src="../util.js"></script>
@@ -48,7 +75,7 @@ Tests.testInvalidArgs = function() {
         var ok = false;
         var rv;
         // assert that GL function fails when called with invalid args
-        assertFail("This should fail: "+name+"("+mutatedArgs.map(function(a){return Object.toSource(a)}).join(",")+")",
+        assertFail("This should fail: "+name+"("+argsToString(mutatedArgs)+")",
           function(){
             GL.getError(); // clear off existing error
             rv = GL[name].apply(GL, mutatedArgs);
@@ -58,7 +85,7 @@ Tests.testInvalidArgs = function() {
         // if we need to cleanup the return value, do it here
         // e.g. calling gl.deleteBuffer(rv) after testing gl.createBuffer() above
         if (gen.returnValueCleanup && rv != null) {
-          assertOk("Cleaning up return value after "+name+"("+mutatedArgs.map(function(a){return Object.toSource(a)}).join(",")+")",
+          assertOk("Cleaning up return value after "+name+"("+argsToString(mutatedArgs)+")",
                    function() { gen.returnValueCleanup(rv); });
         }
         GL.getError();

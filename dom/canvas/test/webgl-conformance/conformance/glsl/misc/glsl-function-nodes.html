@@ -1,8 +1,30 @@
 <!--
-Copyright (c) 2011 The Chromium Authors. All rights reserved.
-Use of this source code is governed by a BSD-style license that can be
-found in the LICENSE file.
- -->
+
+/*
+** Copyright (c) 2012 The Khronos Group Inc.
+**
+** Permission is hereby granted, free of charge, to any person obtaining a
+** copy of this software and/or associated documentation files (the
+** "Materials"), to deal in the Materials without restriction, including
+** without limitation the rights to use, copy, modify, merge, publish,
+** distribute, sublicense, and/or sell copies of the Materials, and to
+** permit persons to whom the Materials are furnished to do so, subject to
+** the following conditions:
+**
+** The above copyright notice and this permission notice shall be included
+** in all copies or substantial portions of the Materials.
+**
+** THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+** MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
+*/
+
+-->
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -11,10 +33,9 @@ found in the LICENSE file.
 <link rel="stylesheet" href="../../../resources/js-test-style.css"/>
 <link rel="stylesheet" href="../../resources/glsl-feature-tests.css"/>
 <script src="../../../resources/js-test-pre.js"></script>
-<script src="../../resources/webgl-test.js"> </script>
 <script src="../../resources/webgl-test-utils.js"> </script>
 
-<script id="vshaderFunction", type="x-shader/x-vertex">
+<script id="vshaderFunction" type="x-shader/x-vertex">
 attribute vec4 aPosition;
 varying vec4 vColor;
 
@@ -39,7 +60,7 @@ void main()
 }
 </script>
 
-<script id="vshaderMacro", type="x-shader/x-vertex">
+<script id="vshaderMacro" type="x-shader/x-vertex">
 attribute vec4 aPosition;
 varying vec4 vColor;
 
@@ -61,10 +82,8 @@ void main()
 }
 </script>
 
-<script id="fshader", type="x-shader/x-fragment">
-#if defined(GL_ES)
+<script id="fshader" type="x-shader/x-fragment">
 precision mediump float;
-#endif
 varying vec4 vColor;
 void main()
 {
@@ -78,12 +97,15 @@ void main()
 <div id="description">This tests against a Mac driver bug related to function calls.</div>
 <div id="console"></div>
 <script>
+"use strict";
 var width = 50;
 var height = 50;
+var wtu = WebGLTestUtils;
 
 function drawAndRead(canvasID, vshaderID, buffer)
 {
-    var gl = initWebGL(canvasID, vshaderID, "fshader", ["aPosition"], [0, 0, 0, 1], 1);
+    var gl = wtu.create3DContext(canvasID);
+    var program = wtu.setupProgram(gl, [vshaderID, "fshader"], ["aPosition"]);
     var vertexObject = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexObject);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([ 0,0.5,0, -0.5,-0.5,0, 0.5,-0.5,0 ]), gl.STATIC_DRAW);
@@ -109,10 +131,6 @@ function compareRendering(buffer1, buffer2, tol)
 
 function init()
 {
-    if (window.initNonKhronosFramework) {
-        window.initNonKhronosFramework(false);
-    }
-
     description("tests function nodes");
 
     var bufFunction = new Uint8Array(width * height * 4);
@@ -123,17 +141,16 @@ function init()
         testFailed("Setup failed");
     } else {
         if (compareRendering(bufFunction, bufMacro, 4) == false)
-            testFailedRender("Rendering results are different", bufMacro,
-                             bufFunction, width, height);
+            testFailed("Rendering results are different");
         else
             testPassed("Rendering results are the same");
     }
 }
 
 init();
-successfullyParsed = true;
+var successfullyParsed = true;
 </script>
-<script>finishTest();</script>
+<script src="../../../resources/js-test-post.js"></script>
 </body>
 </html>
 

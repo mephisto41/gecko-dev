@@ -1,19 +1,42 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta charset="utf-8">
+<!--
+
+/*
+** Copyright (c) 2012 The Khronos Group Inc.
+**
+** Permission is hereby granted, free of charge, to any person obtaining a
+** copy of this software and/or associated documentation files (the
+** "Materials"), to deal in the Materials without restriction, including
+** without limitation the rights to use, copy, modify, merge, publish,
+** distribute, sublicense, and/or sell copies of the Materials, and to
+** permit persons to whom the Materials are furnished to do so, subject to
+** the following conditions:
+**
+** The above copyright notice and this permission notice shall be included
+** in all copies or substantial portions of the Materials.
+**
+** THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+** MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
+*/
+
+-->
 <link rel="stylesheet" href="../../resources/js-test-style.css"/>
 <script src="../../resources/js-test-pre.js"></script>
-<script src="../resources/webgl-test.js"></script>
 <script src="../resources/webgl-test-utils.js"></script>
 <script>
+"use strict";
 var wtu;
 var canvas;
 var gl;
 var shouldGenerateGLError;
-var extensionNames = [
-    "WEBKIT_WEBGL_lose_context",
-    "MOZ_WEBGL_lose_context",
-];
 var extensionName;
 var extension;
 
@@ -33,6 +56,8 @@ var ctx2d;
 var imageData;
 var float32array;
 var int32array;
+var OES_vertex_array_object;
+var vertexArrayObject;
 
 function init()
 {
@@ -43,26 +68,20 @@ function init()
 
     description("Tests behavior under a lost context");
 
-    if (window.initNonKhronosFramework) {
-        window.initNonKhronosFramework(true);
-    }
-
     // call testValidContext() before checking for the extension, because this is where we check
     // for the isContextLost() method, which we want to do regardless of the extension's presence.
     testValidContext();
 
-    for (var ii = 0; ii < extensionNames.length; ++ii) {
-        extension = gl.getExtension(extensionNames[ii]);
-        if (extension) {
-            extensionName = extensionNames[ii];
-            break;
-        }
-    }
-    if (!extension) {
-        debug("Could not find lose_context extension under the following names: " + extensionNames.join(" "));
+    extensionName = wtu.getSupportedExtensionWithKnownPrefixes(gl, "WEBGL_lose_context");
+    if (!extensionName) {
+        debug("Could not find WEBGL_lose_context extension");
         finishTest();
         return false;
     }
+    extension = gl.getExtension(extensionName);
+
+    // need an extension that exposes new API methods.
+    OES_vertex_array_object = wtu.getExtensionWithKnownPrefixes(gl, "OES_vertex_array_object");
 
     canvas.addEventListener("webglcontextlost", testLostContext, false);
 
@@ -111,6 +130,24 @@ function testValidContext()
     shouldBeTrue("gl.isRenderbuffer(renderbuffer)");
     shouldBeTrue("gl.isShader(shader)");
     shouldBeTrue("gl.isTexture(texture)");
+
+    if (OES_vertex_array_object) {
+      vertexArrayObject = OES_vertex_array_object.createVertexArrayOES();
+      shouldBe("gl.getError()", "gl.NO_ERROR");
+      shouldBeTrue("OES_vertex_array_object.isVertexArrayOES(vertexArrayObject)");
+    }
+}
+
+function testGLNOErrorFunctions(tests) {
+  tests.forEach(function(test) {
+      shouldGenerateGLError(gl, gl.NO_ERROR, test);
+  });
+}
+
+function testFunctionsThatReturnNULL(tests) {
+  tests.forEach(function(test) {
+      shouldBeNull(test);
+  });
 }
 
 function testLostContext()
@@ -262,9 +299,7 @@ function testLostContext()
         "gl.vertexAttribPointer(0, 0, gl.FLOAT, false, 0, 0)",
         "gl.viewport(0, 0, 0, 0)",
     ];
-    for (var i = 0; i < voidTests.length; ++i) {
-        shouldGenerateGLError(gl, gl.NO_ERROR, voidTests[i]);
-    }
+    testGLNOErrorFunctions(voidTests);
 
     // Functions return nullable values should all return null.
     var nullTests = [
@@ -278,8 +313,7 @@ function testLostContext()
         "gl.getActiveUniform(program, 0)",
         "gl.getAttachedShaders(program)",
         "gl.getBufferParameter(gl.ARRAY_BUFFER, gl.BUFFER_SIZE)",
-        // Disabled pending test suite issue:
-        // "gl.getContextAttributes()",
+        "gl.getContextAttributes()",
         "gl.getFramebufferAttachmentParameter(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.FRAMEBUFFER_ATTACHMENT_OBJECT_NAME)",
         "gl.getParameter(gl.CURRENT_PROGRAM)",
         "gl.getProgramInfoLog(program)",
@@ -295,9 +329,7 @@ function testLostContext()
         "gl.getSupportedExtensions()",
         "gl.getExtension('" + extensionName + "')",
     ];
-    for (var i = 0; i < nullTests.length; ++i) {
-        shouldBeNull(nullTests[i]);
-    }
+    testFunctionsThatReturnNULL(nullTests);
 
     // "Is" queries should all return false.
     shouldBeFalse("gl.isBuffer(buffer)");
@@ -309,6 +341,20 @@ function testLostContext()
     shouldBeFalse("gl.isTexture(texture)");
 
     shouldBe("gl.getError()", "gl.NO_ERROR");
+
+    // test extensions
+    if (OES_vertex_array_object) {
+      testGLNOErrorFunctions(
+        [
+          "OES_vertex_array_object.bindVertexArrayOES(vertexArrayObject)",
+          "OES_vertex_array_object.isVertexArrayOES(vertexArrayObject)",
+          "OES_vertex_array_object.deleteVertexArrayOES(vertexArrayObject)",
+        ]);
+      testFunctionsThatReturnNULL(
+        [
+          "OES_vertex_array_object.createVertexArrayOES()",
+        ]);
+    }
 
     debug("");
 

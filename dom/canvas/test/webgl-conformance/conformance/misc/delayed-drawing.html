@@ -1,8 +1,30 @@
 <!--
-Copyright (c) 2011 The Chromium Authors. All rights reserved.
-Use of this source code is governed by a BSD-style license that can be
-found in the LICENSE file.
- -->
+
+/*
+** Copyright (c) 2012 The Khronos Group Inc.
+**
+** Permission is hereby granted, free of charge, to any person obtaining a
+** copy of this software and/or associated documentation files (the
+** "Materials"), to deal in the Materials without restriction, including
+** without limitation the rights to use, copy, modify, merge, publish,
+** distribute, sublicense, and/or sell copies of the Materials, and to
+** permit persons to whom the Materials are furnished to do so, subject to
+** the following conditions:
+**
+** The above copyright notice and this permission notice shall be included
+** in all copies or substantial portions of the Materials.
+**
+** THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+** MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
+*/
+
+-->
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -10,7 +32,6 @@ found in the LICENSE file.
 <title>WebGL Delayed Drawing test.</title>
 <link rel="stylesheet" href="../../resources/js-test-style.css"/>
 <script src="../../resources/js-test-pre.js"></script>
-<script src="../resources/webgl-test.js"> </script>
 <script src="../resources/webgl-test-utils.js"> </script>
 </head>
 <body>
@@ -18,12 +39,14 @@ found in the LICENSE file.
 <div id="description"></div>
 <div id="console"></div>
 <script>
+"use strict";
+enableJSTestPreVerboseLogging();
 description(document.title);
 var wtu = WebGLTestUtils;
 var gl = wtu.create3DContext("example");
 var program = wtu.setupTexturedQuad(gl);
 
-glErrorShouldBe(gl, gl.NO_ERROR, "Should be no errors from setup.");
+wtu.glErrorShouldBe(gl, gl.NO_ERROR, "Should be no errors from setup.");
 
 var tex = gl.createTexture();
 wtu.fillTexture(gl, tex, 5, 3, [0, 192, 128, 255]);
@@ -47,15 +70,15 @@ function step2() {
 }
 
 function drawAndCheck() {
-  glErrorShouldBe(gl, gl.NO_ERROR, "Should be no errors before drawing.");
-  wtu.drawQuad(gl);
-  glErrorShouldBe(gl, gl.NO_ERROR, "Should be no errors from drawing.");
+  wtu.glErrorShouldBe(gl, gl.NO_ERROR, "Should be no errors before drawing.");
+  wtu.clearAndDrawUnitQuad(gl);
+  wtu.glErrorShouldBe(gl, gl.NO_ERROR, "Should be no errors from drawing.");
   wtu.checkCanvas(
       gl, [0, 192, 128, 255],
       "draw should be 0, 192, 128, 255");
 }
 
-successfullyParsed = true;
+var successfullyParsed = true;
 </script>
 </body>
 </html>

@@ -1,42 +1,47 @@
 <!DOCTYPE html>
-<html><head>
+<html>
+<head>
 <meta charset="utf-8">
 <!--
-Tests for the OpenGL ES 2.0 HTML Canvas context
 
-Copyright (C) 2011  Ilmari Heikkinen <ilmari.heikkinen@gmail.com>
-
-Permission is hereby granted, free of charge, to any person
-obtaining a copy of this software and associated documentation
-files (the "Software"), to deal in the Software without
-restriction, including without limitation the rights to use,
-copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following
-conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
+/*
+** Copyright (c) 2012 The Khronos Group Inc.
+**
+** Permission is hereby granted, free of charge, to any person obtaining a
+** copy of this software and/or associated documentation files (the
+** "Materials"), to deal in the Materials without restriction, including
+** without limitation the rights to use, copy, modify, merge, publish,
+** distribute, sublicense, and/or sell copies of the Materials, and to
+** permit persons to whom the Materials are furnished to do so, subject to
+** the following conditions:
+**
+** The above copyright notice and this permission notice shall be included
+** in all copies or substantial portions of the Materials.
+**
+** THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+** MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
+*/
 
 -->
 <link rel="stylesheet" type="text/css" href="../unit.css" />
 <script type="application/x-javascript" src="../unit.js"></script>
 <script type="application/x-javascript" src="../util.js"></script>
-<script src="../../../resources/cors-util.js"></script>
+<script type="application/x-javascript" src="../../resources/webgl-test-utils.js"></script>
 <script type="application/x-javascript">
+var wtu = WebGLTestUtils;
+var defaultImgUrl = "http://www.opengl.org/img/opengl_logo.jpg";
+var localImgUrl = "../../resources/opengl_logo.jpg";
+
+Tests.autoinit = false; // Prevents the test from running until the image is loaded
 
 Tests.startUnit = function () {
   var canvas = document.getElementById('gl');
-  var gl = wrapGLContext(canvas.getContext(GL_CONTEXT_ID));
+  var gl = wrapGLContext(getGLContext(canvas));
   return [gl];
 }
 
@@ -78,7 +83,6 @@ Tests.testReadPixels = function(gl) {
 
 Tests.testReadPixelsSOPIMG = function(gl) {
     var img = document.getElementById("i");
-    while (!img.complete) {}
     var tex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, tex);
     // SOP failure
@@ -92,7 +96,6 @@ Tests.testReadPixelsSOPIMG = function(gl) {
 }
 Tests.testReadPixelsSOPCanvas = function(gl) {
     var img = document.getElementById("i");
-    while (!img.complete) {}
     var c = document.getElementById("c");
     c.getContext("2d").drawImage(img, 0, 0);
     assertFail("canvas throws because not origin clean",
@@ -112,14 +115,10 @@ Tests.testReadPixelsSOPCanvas = function(gl) {
 Tests.endUnit = function(gl) {
 }
 
+wtu.setupImageForCrossOriginTest("#i", defaultImgUrl, localImgUrl, initTests);
 </script>
 </head><body>
 <canvas id="gl" width="16" height="16"></canvas>
 <canvas id="c" width="128" height="128"></canvas>
 <img id="i">
-<script>
-var imagePath = 'resources/opengl_logo.jpg';
-var relPathToBase = '../../../';
-setExampleDotComImage('i', imagePath, relPathToBase);
-</script>
 </body></html>

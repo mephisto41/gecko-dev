@@ -1,26 +1,28 @@
 <!--
-Copyright (C) 2011 Apple Computer, Inc.  All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-1. Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
-2. Redistributions in binary form must reproduce the above copyright
-   notice, this list of conditions and the following disclaimer in the
-   documentation and/or other materials provided with the distribution.
+/*
+** Copyright (c) 2012 The Khronos Group Inc.
+**
+** Permission is hereby granted, free of charge, to any person obtaining a
+** copy of this software and/or associated documentation files (the
+** "Materials"), to deal in the Materials without restriction, including
+** without limitation the rights to use, copy, modify, merge, publish,
+** distribute, sublicense, and/or sell copies of the Materials, and to
+** permit persons to whom the Materials are furnished to do so, subject to
+** the following conditions:
+**
+** The above copyright notice and this permission notice shall be included
+** in all copies or substantial portions of the Materials.
+**
+** THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+** MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
+*/
 
-THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
-EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
-CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
-OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
 <!DOCTYPE html>
@@ -30,7 +32,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <title>Rendering Test</title>
     <link rel="stylesheet" href="../../resources/js-test-style.css"/>
     <script src="../../resources/js-test-pre.js"></script>
-    <script src="../resources/webgl-test.js"> </script>
+    <script src="../resources/webgl-test-utils.js"> </script>
 </head>
 <body>
 <canvas id="example" width="50" height="50">
@@ -54,27 +56,14 @@ There is supposed to be an example drawing here, but it's not important.
     </script>
 
     <script>
-        function fail(x,y, buf, shouldBe)
-        {
-            var i = (y*50+x) * 4;
-            var reason = "pixel at ("+x+","+y+") is ("+buf[i]+","+buf[i+1]+","+buf[i+2]+","+buf[i+3]+"), should be "+shouldBe;
-            testFailed(reason);
-        }
-
-        function pass()
-        {
-            testPassed("drawing is correct");
-        }
-
+        "use strict";
         function init()
         {
-            if (window.initNonKhronosFramework) {
-                window.initNonKhronosFramework(false);
-            }
-
             description(document.title);
 
-            gl = initWebGL("example", "vshader", "fshader", [ "vPosition"], [ 0, 0, 0, 1 ], 1);
+            var wtu = WebGLTestUtils;
+            var gl = wtu.create3DContext("example");
+            var program = wtu.setupProgram(gl, ["vshader", "fshader"], ["vPosition"]);
 
             var vertexObject = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, vertexObject);
@@ -85,39 +74,21 @@ There is supposed to be an example drawing here, but it's not important.
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-            var buf = new Uint8Array(50 * 50 * 4);
-            gl.readPixels(0, 0, 50, 50, gl.RGBA, gl.UNSIGNED_BYTE, buf);
-
             // Test several locations
             // First line should be all black
-            for (var i = 0; i < 50; ++i)
-                if (buf[i*4] != 0 || buf[i*4+1] != 0 || buf[i*4+2] != 0 || buf[i*4+3] != 255) {
-                    fail(i, 0, buf, "(0,0,0,255)");
-                    return;
-                }
+            wtu.checkCanvasRect(gl, 0, 0, 50, 1, [0, 0, 0, 0]);
 
             // Line 15 should be red for at least 10 red pixels starting 20 pixels in
-            var offset = (15*50+20) * 4;
-            for (var i = 0; i < 10; ++i)
-                if (buf[offset+i*4] != 255 || buf[offset+i*4+1] != 0 || buf[offset+i*4+2] != 0 || buf[offset+i*4+3] != 255) {
-                    fail(20 + i, 15, buf, "(255,0,0,255)");
-                    return;
-                }
-            // Last line should be all black
-            offset = (49*50) * 4;
-            for (var i = 0; i < 50; ++i)
-                if (buf[offset+i*4] != 0 || buf[offset+i*4+1] != 0 || buf[offset+i*4+2] != 0 || buf[offset+i*4+3] != 255) {
-                    fail(i, 49, buf, "(0,0,0,255)");
-                    return;
-                }
+            wtu.checkCanvasRect(gl, 20, 15, 10, 1, [255, 0, 0, 255]);
 
-            pass();
+            // Last line should be all black
+            wtu.checkCanvasRect(gl, 0, 49, 50, 1, [0, 0, 0, 0]);
        }
 
        init();
-       successfullyParsed = true;
+       var successfullyParsed = true;
     </script>
-<script>finishTest();</script>
+<script src="../../resources/js-test-post.js"></script>
 
 </body>
 </html>

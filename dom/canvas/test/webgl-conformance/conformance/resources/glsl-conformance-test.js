@@ -1,3 +1,25 @@
+/*
+** Copyright (c) 2012 The Khronos Group Inc.
+**
+** Permission is hereby granted, free of charge, to any person obtaining a
+** copy of this software and/or associated documentation files (the
+** "Materials"), to deal in the Materials without restriction, including
+** without limitation the rights to use, copy, modify, merge, publish,
+** distribute, sublicense, and/or sell copies of the Materials, and to
+** permit persons to whom the Materials are furnished to do so, subject to
+** the following conditions:
+**
+** The above copyright notice and this permission notice shall be included
+** in all copies or substantial portions of the Materials.
+**
+** THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+** MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
+*/
 GLSLConformanceTester = (function(){
 
 var wtu = WebGLTestUtils;
@@ -28,10 +50,10 @@ var fShaderDB = {};
 
 /**
  * vShaderSource: the source code for vertex shader
- * vShaderSuccess: true if vertex shader compiliation should
+ * vShaderSuccess: true if vertex shader compilation should
  *   succeed.
  * fShaderSource: the source code for fragment shader
- * fShaderSuccess: true if fragment shader compiliation should
+ * fShaderSuccess: true if fragment shader compilation should
  *   succeed.
  * linkSuccess: true of link should succeed
  * passMsg: msg to describe success condition.
@@ -40,9 +62,10 @@ var fShaderDB = {};
  */
 function runOneTest(gl, info) {
   var passMsg = info.passMsg
+  debug("");
   debug("test: " + passMsg);
 
-  var console = document.getElementById("console");
+  var consoleDiv = document.getElementById("console");
 
   if (info.vShaderSource === undefined) {
     if (info.vShaderId) {
@@ -67,7 +90,7 @@ function runOneTest(gl, info) {
   var vSource = info.vShaderPrep ? info.vShaderPrep(info.vShaderSource) :
     info.vShaderSource;
 
-  wtu.addShaderSource(console, vLabel, vSource);
+  wtu.addShaderSource(consoleDiv, vLabel, vSource);
 
   // Reuse identical shaders so we test shared shader.
   var vShader = vShaderDB[vSource];
@@ -81,7 +104,7 @@ function runOneTest(gl, info) {
     }
     // As per GLSL 1.0.17 10.27 we can only check for success on
     // compileShader, not failure.
-    if (info.vShaderSuccess && !vShader) {
+    if (!info.ignoreResults && info.vShaderSuccess && !vShader) {
       testFailed("[unexpected vertex shader compile status] (expected: " +
                  info.vShaderSuccess + ") " + passMsg);
     }
@@ -91,10 +114,16 @@ function runOneTest(gl, info) {
     }
   }
 
+  var debugShaders = gl.getExtension('WEBGL_debug_shaders');
+  if (debugShaders && vShader) {
+    wtu.addShaderSource(consoleDiv, vLabel + " translated for driver",
+                        debugShaders.getTranslatedShaderSource(vShader));
+  }
+
   var fSource = info.fShaderPrep ? info.fShaderPrep(info.fShaderSource) :
     info.fShaderSource;
 
-  wtu.addShaderSource(console, fLabel, fSource);
+  wtu.addShaderSource(consoleDiv, fLabel, fSource);
 
   // Reuse identical shaders so we test shared shader.
   var fShader = fShaderDB[fSource];
@@ -102,45 +131,72 @@ function runOneTest(gl, info) {
     fShader = wtu.loadShader(gl, fSource, gl.FRAGMENT_SHADER);
     if (info.fShaderTest) {
       if (!info.fShaderTest(fShader)) {
-        testFailed("[fragment shdaer test] " + passMsg);
+        testFailed("[fragment shader test] " + passMsg);
         return;
       }
     }
     //debug(fShader == null ? "fail" : "succeed");
     // As per GLSL 1.0.17 10.27 we can only check for success on
     // compileShader, not failure.
-    if (info.fShaderSuccess && !fShader) {
+    if (!info.ignoreResults && info.fShaderSuccess && !fShader) {
       testFailed("[unexpected fragment shader compile status] (expected: " +
                 info.fShaderSuccess + ") " + passMsg);
       return;
     }
+
     // Safe the shaders so we test shared shader.
     if (fShader) {
       fShaderDB[fSource] = fShader;
     }
   }
 
+  if (debugShaders && fShader) {
+    wtu.addShaderSource(consoleDiv, fLabel + " translated for driver",
+                        debugShaders.getTranslatedShaderSource(fShader));
+  }
+
   if (vShader && fShader) {
     var program = gl.createProgram();
     gl.attachShader(program, vShader);
     gl.attachShader(program, fShader);
-    gl.bindAttribLocation(program, 0, "vPosition");
-    gl.bindAttribLocation(program, 1, "texCoord0");
+
+    if (vSource.indexOf("vPosition") >= 0) {
+      gl.bindAttribLocation(program, 0, "vPosition");
+    }
+    if (vSource.indexOf("texCoord0") >= 0) {
+      gl.bindAttribLocation(program, 1, "texCoord0");
+    }
     gl.linkProgram(program);
     var linked = (gl.getProgramParameter(program, gl.LINK_STATUS) != 0);
     if (!linked) {
       var error = gl.getProgramInfoLog(program);
       log("*** Error linking program '"+program+"':"+error);
     }
-    if (linked != info.linkSuccess) {
+    if (!info.ignoreResults && linked != info.linkSuccess) {
       testFailed("[unexpected link status] " + passMsg);
       return;
     }
   } else {
-    if (info.linkSuccess) {
+    if (!info.ignoreResults && info.linkSuccess) {
       testFailed("[link failed] " + passMsg);
       return;
     }
+  }
+
+  if (parseInt(wtu.getUrlOptions().dumpShaders)) {
+    var vInfo = {
+      shader: vShader,
+      shaderSuccess: info.vShaderSuccess,
+      label: vLabel,
+      source: vSource
+    };
+    var fInfo = {
+      shader: fShader,
+      shaderSuccess: info.fShaderSuccess,
+      label: fLabel,
+      source: fSource
+    };
+    wtu.dumpShadersInfo(gl, window.location.pathname, passMsg, vInfo, fInfo);
   }
 
   if (!info.render) {
@@ -150,13 +206,13 @@ function runOneTest(gl, info) {
 
   gl.useProgram(program);
   wtu.setupUnitQuad(gl);
-  wtu.drawQuad(gl);
+  wtu.clearAndDrawUnitQuad(gl);
 
   var div = document.createElement("div");
   div.className = "testimages";
-  wtu.insertImage(div, "result", wtu.makeImage(gl.canvas));
+  wtu.insertImage(div, "result", wtu.makeImageFromCanvas(gl.canvas));
   div.appendChild(document.createElement('br'));
-  console.appendChild(div);
+  consoleDiv.appendChild(div);
   wtu.checkCanvas(gl, [0, 255, 0, 255], "should be green", 0);
 }
 
@@ -172,11 +228,17 @@ function runTests(shaderInfos) {
     return;
   }
 
-  for (var ii = 0; ii < shaderInfos.length; ++ii) {
-    runOneTest(gl, shaderInfos[ii]);
-  }
+  var testIndex = 0;
+  var runNextTest = function() {
+    if (testIndex == shaderInfos.length) {
+      finishTest();
+      return;
+    }
 
-  finishTest();
+    runOneTest(gl, shaderInfos[testIndex++]);
+    setTimeout(runNextTest, 1);
+  }
+  runNextTest();
 };
 
 function loadExternalShaders(filename, passMsg) {
@@ -245,7 +307,7 @@ function getSuccess(msg) {
   if (msg.indexOf("succeed") >= 0) {
     return true;
   }
-  testFailed("bad test description. Must have 'fail' or 'success'");
+  testFailed("bad test description. Must have 'fail' or 'succeed'");
 }
 
 function setupTest() {

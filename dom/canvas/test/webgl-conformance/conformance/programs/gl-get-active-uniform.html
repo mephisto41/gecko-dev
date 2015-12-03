@@ -1,8 +1,30 @@
 <!--
-Copyright (c) 2011 The Chromium Authors. All rights reserved.
-Use of this source code is governed by a BSD-style license that can be
-found in the LICENSE file.
- -->
+
+/*
+** Copyright (c) 2012 The Khronos Group Inc.
+**
+** Permission is hereby granted, free of charge, to any person obtaining a
+** copy of this software and/or associated documentation files (the
+** "Materials"), to deal in the Materials without restriction, including
+** without limitation the rights to use, copy, modify, merge, publish,
+** distribute, sublicense, and/or sell copies of the Materials, and to
+** permit persons to whom the Materials are furnished to do so, subject to
+** the following conditions:
+**
+** The above copyright notice and this permission notice shall be included
+** in all copies or substantial portions of the Materials.
+**
+** THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+** MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
+*/
+
+-->
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -10,7 +32,6 @@ found in the LICENSE file.
 <title>WebGL getActiveUniform conformance test.</title>
 <link rel="stylesheet" href="../../resources/js-test-style.css"/>
 <script src="../../resources/js-test-pre.js"></script>
-<script src="../resources/webgl-test.js"> </script>
 <script src="../resources/webgl-test-utils.js"> </script>
 </head>
 <body>
@@ -49,6 +70,7 @@ void main()
 }
 </script>
 <script>
+"use strict";
 description("Tests getActiveUniform for various types");
 
 var wtu = WebGLTestUtils;
@@ -92,7 +114,7 @@ function createProgram(type, access) {
       source.replace('$type', type).replace('$access', access),
       gl.FRAGMENT_SHADER);
   var program = wtu.setupProgram(gl, [vs, fs]);
-  glErrorShouldBe(gl, gl.NO_ERROR, "no errors from setup");
+  wtu.glErrorShouldBe(gl, gl.NO_ERROR, "no errors from setup");
   return program;
 }
 
@@ -118,24 +140,24 @@ for (var tt = 0; tt < tests.length; ++tt) {
 }
 
 var p1 = wtu.setupProgram(gl, [vs, 'fshaderA']);
-glErrorShouldBe(gl, gl.NO_ERROR, "no errors from program A");
+wtu.glErrorShouldBe(gl, gl.NO_ERROR, "no errors from program A");
 var p2 = wtu.setupProgram(gl, [vs, 'fshaderB']);
-glErrorShouldBe(gl, gl.NO_ERROR, "no errors from program B");
+wtu.glErrorShouldBe(gl, gl.NO_ERROR, "no errors from program B");
 var l1 = gl.getUniformLocation(p1, 'uniform0');
-glErrorShouldBe(gl, gl.NO_ERROR, "no errors getting location of uniform0 p1");
+wtu.glErrorShouldBe(gl, gl.NO_ERROR, "no errors getting location of uniform0 p1");
 var l2 = gl.getUniformLocation(p2, 'uniform0');
-glErrorShouldBe(gl, gl.NO_ERROR, "no errors getting location of uniform0 p2");
+wtu.glErrorShouldBe(gl, gl.NO_ERROR, "no errors getting location of uniform0 p2");
 
 gl.useProgram(p2);
 gl.uniform1f(l2, 1);
-glErrorShouldBe(gl, gl.NO_ERROR, "no errors setting uniform 0");
+wtu.glErrorShouldBe(gl, gl.NO_ERROR, "no errors setting uniform 0");
 gl.uniform1f(l1, 2);
-glErrorShouldBe(gl, gl.INVALID_OPERATION,
+wtu.glErrorShouldBe(gl, gl.INVALID_OPERATION,
                 "setting a uniform using a location from another program");
 
-successfullyParsed = true;
+var successfullyParsed = true;
 </script>
-<script>finishTest();</script>
+<script src="../../resources/js-test-post.js"></script>
 
 </body>
 </html>
