@@ -29,7 +29,6 @@ EXTRA_SUPPORT_FILES = [
     'always-fail.html',
     'iframe-autoresize.js',
     'mochi-single.html',
-    '../../webgl-mochitest/driver-info.js',
 ]
 
 ACCEPTABLE_ERRATA_KEYS = set([
@@ -402,7 +401,7 @@ def LoadINI(path):
                 assert line[-1] == ']', '{}:{}'.format(path, lineNum)
 
                 curSectionName = line[1:-1]
-                assert curSectionName not in ret, 'Line {}: Duplicate section '.format(lineNum, line)
+                assert curSectionName not in ret, 'Line {}: Duplicate section: {}'.format(lineNum, line)
 
                 curSectionMap = {}
                 ret[curSectionName] = (lineNum, curSectionMap)
@@ -482,7 +481,6 @@ if __name__ == '__main__':
     wrapperPathStrList = WriteWrappers(testPathStrList)
 
     supportPathStrList = GetSupportFileList()
-
     WriteManifest(wrapperPathStrList, supportPathStrList)
 
     print('Done!')
