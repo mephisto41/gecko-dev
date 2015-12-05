@@ -1,25 +1,6 @@
-/*
-** Copyright (c) 2012 The Khronos Group Inc.
-**
-** Permission is hereby granted, free of charge, to any person obtaining a
-** copy of this software and/or associated documentation files (the
-** "Materials"), to deal in the Materials without restriction, including
-** without limitation the rights to use, copy, modify, merge, publish,
-** distribute, sublicense, and/or sell copies of the Materials, and to
-** permit persons to whom the Materials are furnished to do so, subject to
-** the following conditions:
-**
-** The above copyright notice and this permission notice shall be included
-** in all copies or substantial portions of the Materials.
-**
-** THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-** MATERIALS OR THE USE OR OTHER DEALINGS IN THE MATERIALS.
-*/
+// Copyright (c) 2009 The Chromium Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
 
 // This is a test harness for running javascript tests in the browser.
 // The only identifier exposed by this harness is WebGLTestHarnessModule.
@@ -35,14 +16,13 @@
 //    var testHarness = new WebGLTestHarnessModule.TestHarness(
 //        iframe,
 //        fileListURL,
-//        reportResults,
-//        options);
+//        reportResults);
 //
 // The harness will load the fileListURL and parse it for the URLs, one URL
-// per line preceded by options, see below. URLs should be on the same domain
-// and at the  same folder level or below the main html file.  If any URL ends
-// in .txt it will be parsed as well so you can nest .txt files. URLs inside a
-// .txt file should be relative to that text file.
+// per line. URLs should be on the same domain and at the same folder level
+// or below the main html file.  If any URL ends in .txt it will be parsed
+// as well so you can nest .txt files. URLs inside a .txt file should be
+// relative to that text file.
 //
 // During startup, for each page found the reportFunction will be called with
 // WebGLTestHarnessModule.TestHarness.reportType.ADD_PAGE and msg will be
@@ -75,7 +55,7 @@
 // associate with the test. If your testing framework supports checking for
 // timeout you can call it with success equal to undefined in that case.
 //
-// To run the tests, call testHarness.runTests(options);
+// To run the tests, call testHarness.runTests();
 //
 // For each test run, before the page is loaded the reportFunction will be
 // called with WebGLTestHarnessModule.TestHarness.reportType.START_PAGE and msg
@@ -99,77 +79,6 @@
 //
 // Finally, when all the tests have completed the reportFunction will be called
 // with WebGLTestHarnessModule.TestHarness.reportType.FINISHED_ALL_TESTS.
-//
-// Harness Options
-//
-// These are passed in to the TestHarness as a JavaScript object
-//
-// version: (required!)
-//
-//     Specifies a version used to filter tests. Tests marked as requiring
-//     a version greater than this version will not be included.
-//
-//     example: new TestHarness(...., {version: "3.1.2"});
-//
-// minVersion:
-//
-//     Specifies the minimum version a test must require to be included.
-//     This basically flips the filter so that only tests marked with
-//     --min-version will be included if they are at this minVersion or
-//     greater.
-//
-//     example: new TestHarness(...., {minVersion: "2.3.1"});
-//
-// maxVersion:
-//
-//     Specifies the maximum version a test must require to be included.
-//     This basically flips the filter so that only tests marked with
-//     --max-version will be included if they are at this maxVersion or
-//     less.
-//
-//     example: new TestHarness(...., {maxVersion: "2.3.1"});
-//
-// fast:
-//
-//     Specifies to skip any tests marked as slow.
-//
-//     example: new TestHarness(..., {fast: true});
-//
-// Test Options:
-//
-// Any test URL or .txt file can be prefixed by the following options
-//
-// min-version:
-//
-//     Sets the minimum version required to include this test. A version is
-//     passed into the harness options. Any test marked as requiring a
-//     min-version greater than the version passed to the harness is skipped.
-//     This allows you to add new tests to a suite of tests for a future
-//     version of the suite without including the test in the current version.
-//     If no -min-version is specified it is inheriited from the .txt file
-//     including it. The default is 1.0.0
-//
-//     example:  --min-version 2.1.3 sometest.html
-//
-// max-version:
-//
-//     Sets the maximum version required to include this test. A version is
-//     passed into the harness options. Any test marked as requiring a
-//     max-version less than the version passed to the harness is skipped.
-//     This allows you to test functionality that has been removed from later
-//     versions of the suite.
-//     If no -max-version is specified it is inherited from the .txt file
-//     including it.
-//
-//     example:  --max-version 1.9.9 sometest.html
-//
-// slow:
-//
-//     Marks a test as slow. Slow tests can be skipped by passing fastOnly: true
-//     to the TestHarness. Of course you need to pass all tests but sometimes
-//     you'd like to test quickly and run only the fast subset of tests.
-//
-//     example:  --slow some-test-that-takes-2-mins.html
 //
 
 WebGLTestHarnessModule = function() {
@@ -226,39 +135,6 @@ var loadTextFileAsynchronous = function(url, callback) {
 };
 
 /**
- * @param {string} versionString WebGL version string.
- * @return {number} Integer containing the WebGL major version.
- */
-var getMajorVersion = function(versionString) {
-  if (!versionString) {
-    return 1;
-  }
-  return parseInt(versionString.split(" ")[0].split(".")[0], 10);
-};
-
-/**
- * @param {string} url Base URL of the test.
- * @param {number} webglVersion Integer containing the WebGL major version.
- * @param {boolean} dumpShaders add dumpShader query parameter if true.
- * @return {string} URL that will run the test with the given WebGL version.
- */
-var getURLWithOptions = function(url, webglVersion, dumpShaders) {
-  var queryArgs = 0;
-
-  if (webglVersion) {
-    url += "?webglVersion=" + webglVersion;
-    queryArgs++;
-  }
-
-  if (dumpShaders) {
-    url += queryArgs ? "&" : "?";
-    url += "dumpShaders=1";
-  }
-
-  return url;
-};
-
-/**
  * Compare version strings.
  */
 var greaterThanOrEqualToVersion = function(have, want) {
@@ -273,9 +149,6 @@ var greaterThanOrEqualToVersion = function(have, want) {
   for (var ii = 0; ii < want.length; ++ii) {
     var wantNum = parseInt(want[ii]);
     var haveNum = have[ii] ? parseInt(have[ii]) : 0
-    if (haveNum > wantNum) {
-      return true; // 2.0.0 is greater than 1.2.3
-    }
     if (haveNum < wantNum) {
       return false;
     }
@@ -319,9 +192,8 @@ var getFileList = function(url, callback, options) {
 
   var globalOptions = copyObject(options);
   globalOptions.defaultVersion = "1.0";
-  globalOptions.defaultMaxVersion = null;
 
-  var getFileListImpl = function(prefix, line, lineNum, hierarchicalOptions, callback) {
+  var getFileListImpl = function(prefix, line, hierarchicalOptions, callback) {
     var files = [];
 
     var args = line.split(/\s+/);
@@ -332,22 +204,16 @@ var getFileList = function(url, callback, options) {
       var arg = args[jj];
       if (arg[0] == '-') {
         if (arg[1] != '-') {
-          throw ("bad option at in " + url + ":" + lineNum + ": " + arg);
+          throw ("bad option at in " + url + ":" + (ii + 1) + ": " + str);
         }
         var option = arg.substring(2);
         switch (option) {
-          // no argument options.
-          case 'slow':
-            testOptions[toCamelCase(option)] = true;
-            break;
-          // one argument options.
           case 'min-version':
-          case 'max-version':
             ++jj;
             testOptions[toCamelCase(option)] = args[jj];
             break;
           default:
-            throw ("bad unknown option '" + option + "' at in " + url + ":" + lineNum + ": " + arg);
+            throw ("bad unknown option '" + option + "' at in " + url + ":" + (ii + 1) + ": " + str);
         }
       } else {
         nonOptions.push(arg);
@@ -360,26 +226,11 @@ var getFileList = function(url, callback, options) {
       if (!minVersion) {
         minVersion = hierarchicalOptions.defaultVersion;
       }
-      var maxVersion = testOptions.maxVersion;
-      if (!maxVersion) {
-        maxVersion = hierarchicalOptions.defaultMaxVersion;
-      }
-      var slow = testOptions.slow;
-      if (!slow) {
-        slow = hierarchicalOptions.defaultSlow;
-      }
 
-      if (globalOptions.fast && slow) {
-        useTest = false;
-      } else if (globalOptions.minVersion) {
+      if (globalOptions.minVersion) {
         useTest = greaterThanOrEqualToVersion(minVersion, globalOptions.minVersion);
-      } else if (globalOptions.maxVersion && maxVersion) {
-        useTest = greaterThanOrEqualToVersion(globalOptions.maxVersion, maxVersion);
       } else {
         useTest = greaterThanOrEqualToVersion(globalOptions.version, minVersion);
-        if (maxVersion) {
-          useTest = useTest && greaterThanOrEqualToVersion(maxVersion, globalOptions.version);
-        }
       }
     }
 
@@ -392,12 +243,6 @@ var getFileList = function(url, callback, options) {
       // If a version was explicity specified pass it down.
       if (testOptions.minVersion) {
         hierarchicalOptions.defaultVersion = testOptions.minVersion;
-      }
-      if (testOptions.maxVersion) {
-        hierarchicalOptions.defaultMaxVersion = testOptions.maxVersion;
-      }
-      if (testOptions.slow) {
-        hierarchicalOptions.defaultSlow = testOptions.slow;
       }
       loadTextFileAsynchronous(url, function() {
         return function(success, text) {
@@ -421,9 +266,9 @@ var getFileList = function(url, callback, options) {
                 str[0] != ";" &&
                 str.substr(0, 2) != "//") {
               ++count;
-              getFileListImpl(prefix, str, ii + 1, copyObject(hierarchicalOptions), function(index) {
+              getFileListImpl(prefix, str, copyObject(hierarchicalOptions), function(index) {
                 return function(success, new_files) {
-                  //log("got files: " + new_files.length);
+                  log("got files: " + new_files.length);
                   if (success) {
                     files[index] = new_files;
                   }
@@ -439,7 +284,7 @@ var getFileList = function(url, callback, options) {
               fail = true;
             }
             --count;
-            //log("count: " + count);
+            log("count: " + count);
             if (!count) {
               callback(!fail, files);
             }
@@ -452,7 +297,7 @@ var getFileList = function(url, callback, options) {
     }
   };
 
-  getFileListImpl('', url, 1, globalOptions, function(success, files) {
+  getFileListImpl('', url, globalOptions, function(success, files) {
     // flatten
     var flat = [];
     flatten(files);
@@ -470,34 +315,16 @@ var getFileList = function(url, callback, options) {
   });
 };
 
-var FilterURL = (function() {
-  var prefix = window.location.pathname;
-  prefix = prefix.substring(0, prefix.lastIndexOf("/") + 1);
-  return function(url) {
-    if (url.substring(0, prefix.length) == prefix) {
-      url = url.substring(prefix.length);
-    }
-    return url;
-  };
-}());
-
 var TestFile = function(url) {
   this.url = url;
 };
 
-var Test = function(file) {
-  this.file = file;
-};
-
 var TestHarness = function(iframe, filelistUrl, reportFunc, options) {
   this.window = window;
-  this.iframes = iframe.length ? iframe : [iframe];
+  this.iframe = iframe;
   this.reportFunc = reportFunc;
   this.timeoutDelay = 20000;
   this.files = [];
-  this.allowSkip = options.allowSkip;
-  this.webglVersion = getMajorVersion(options.version);
-  this.dumpShaders = options.dumpShaders;
 
   var that = this;
   getFileList(filelistUrl, function() {
@@ -521,7 +348,6 @@ TestHarness.prototype.addFiles_ = function(success, files) {
   if (!success) {
     this.reportFunc(
         TestHarness.reportType.FINISHED_ALL_TESTS,
-        '',
         'Unable to load tests. Are you running locally?\n' +
         'You need to run from a server or configure your\n' +
         'browser to allow access to local files (not recommended).\n\n' +
@@ -538,112 +364,70 @@ TestHarness.prototype.addFiles_ = function(success, files) {
   for (var ii = 0; ii < files.length; ++ii) {
     log("" + ii + ": " + files[ii]);
     this.files.push(new TestFile(files[ii]));
-    this.reportFunc(TestHarness.reportType.ADD_PAGE, '', files[ii], undefined);
+    this.reportFunc(TestHarness.reportType.ADD_PAGE, files[ii], undefined);
   }
-  this.reportFunc(TestHarness.reportType.READY, '', undefined, undefined);
+  this.reportFunc(TestHarness.reportType.READY, undefined, undefined);
 }
 
-TestHarness.prototype.runTests = function(opt_options) {
-  var options = opt_options || { };
-  options.start = options.start || 0;
-  options.count = options.count || this.files.length;
-
-  this.idleIFrames = this.iframes.slice(0);
-  this.runningTests = {};
-  var testsToRun = [];
-  for (var ii = 0; ii < options.count; ++ii) {
-    testsToRun.push(ii + options.start);
-  }
-  this.numTestsRemaining = options.count;
-  this.testsToRun = testsToRun;
-  this.startNextTest();
+TestHarness.prototype.runTests = function(opt_start, opt_count) {
+  var count = opt_count || this.files.length;
+  this.nextFileIndex = opt_start || 0;
+  this.lastFileIndex = this.nextFileIndex + count;
+  this.startNextFile();
 };
 
-TestHarness.prototype.setTimeout = function(test) {
+TestHarness.prototype.setTimeout = function() {
   var that = this;
-  test.timeoutId = this.window.setTimeout(function() {
-      that.timeout(test);
+  this.timeoutId = this.window.setTimeout(function() {
+      that.timeout();
     }, this.timeoutDelay);
 };
 
-TestHarness.prototype.clearTimeout = function(test) {
-  this.window.clearTimeout(test.timeoutId);
+TestHarness.prototype.clearTimeout = function() {
+  this.window.clearTimeout(this.timeoutId);
 };
 
-TestHarness.prototype.startNextTest = function() {
-  if (this.numTestsRemaining == 0) {
+TestHarness.prototype.startNextFile = function() {
+  if (this.nextFileIndex >= this.lastFileIndex) {
     log("done");
     this.reportFunc(TestHarness.reportType.FINISHED_ALL_TESTS,
-                    '', '', true);
+                    '', true);
   } else {
-    while (this.testsToRun.length > 0 && this.idleIFrames.length > 0) {
-      var testId = this.testsToRun.shift();
-      var iframe = this.idleIFrames.shift();
-      this.startTest(iframe, this.files[testId], this.webglVersion);
+    this.currentFile = this.files[this.nextFileIndex++];
+    log("loading: " + this.currentFile.url);
+    if (this.reportFunc(TestHarness.reportType.START_PAGE,
+                        this.currentFile.url, undefined)) {
+      this.iframe.src = this.currentFile.url;
+      this.setTimeout();
+    } else {
+      this.reportResults(false, "skipped");
+      this.notifyFinished();
     }
   }
 };
 
-TestHarness.prototype.startTest = function(iframe, testFile, webglVersion) {
-  var test = {
-    iframe: iframe,
-    testFile: testFile
-  };
-  var url = testFile.url;
-  this.runningTests[url] = test;
-  log("loading: " + url);
-  if (this.reportFunc(TestHarness.reportType.START_PAGE, url, url, undefined)) {
-    if (this.dumpShaders == 1)
-      iframe.src = getURLWithOptions(url, webglVersion, true);
-    else
-      iframe.src = getURLWithOptions(url, webglVersion);
-    this.setTimeout(test);
-  } else {
-    this.reportResults(url, !!this.allowSkip, "skipped", true);
-    this.notifyFinished(url);
-  }
-};
-
-TestHarness.prototype.getTest = function(url) {
-  var test = this.runningTests[FilterURL(url)];
-  if (!test) {
-    throw("unknown test:" + url);
-  }
-  return test;
-};
-
-TestHarness.prototype.reportResults = function(url, success, msg, skipped) {
-  url = FilterURL(url);
-  var test = this.getTest(url);
-  this.clearTimeout(test);
+TestHarness.prototype.reportResults = function (success, msg) {
+  this.clearTimeout();
   log(success ? "PASS" : "FAIL", msg);
-  this.reportFunc(TestHarness.reportType.TEST_RESULT, url, msg, success, skipped);
+  this.reportFunc(TestHarness.reportType.TEST_RESULT, msg, success);
   // For each result we get, reset the timeout
-  this.setTimeout(test);
+  this.setTimeout();
 };
 
-TestHarness.prototype.dequeTest = function(test) {
-  this.clearTimeout(test);
-  this.idleIFrames.push(test.iframe);
-  delete this.runningTests[test.testFile.url];
-  --this.numTestsRemaining;
-}
-
-TestHarness.prototype.notifyFinished = function(url) {
-  url = FilterURL(url);
-  var test = this.getTest(url);
+TestHarness.prototype.notifyFinished = function () {
+  this.clearTimeout();
+  var url = this.currentFile ? this.currentFile.url : 'unknown';
   log(url + ": finished");
-  this.dequeTest(test);
-  this.reportFunc(TestHarness.reportType.FINISH_PAGE, url, url, true);
-  this.startNextTest();
+  this.reportFunc(TestHarness.reportType.FINISH_PAGE, url, true);
+  this.startNextFile();
 };
 
-TestHarness.prototype.timeout = function(test) {
-  this.dequeTest(test);
-  var url = test.testFile.url;
+TestHarness.prototype.timeout = function() {
+  this.clearTimeout();
+  var url = this.currentFile ? this.currentFile.url : 'unknown';
   log(url + ": timeout");
-  this.reportFunc(TestHarness.reportType.FINISH_PAGE, url, url, undefined);
-  this.startNextTest();
+  this.reportFunc(TestHarness.reportType.FINISH_PAGE, url, undefined);
+  this.startNextFile();
 };
 
 TestHarness.prototype.setTimeoutDelay = function(x) {
@@ -651,9 +435,7 @@ TestHarness.prototype.setTimeoutDelay = function(x) {
 };
 
 return {
-    'TestHarness': TestHarness,
-    'getMajorVersion': getMajorVersion,
-    'getURLWithOptions': getURLWithOptions
+    'TestHarness': TestHarness
   };
 
 }();

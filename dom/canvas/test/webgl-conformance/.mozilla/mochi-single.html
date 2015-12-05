@@ -1,146 +1,65 @@
 <!DOCTYPE HTML>
 <html>
 <head>
-  <meta http-equiv='content-type' content='text/html; charset=utf-8' />
-  <title> WebGL Conformance Test Suite Single Test Wrapper</title>
-  <!-- Uncomment this to use this without mochi-wrapper.html files.
-  <script type='application/javascript' src='/tests/SimpleTest/SimpleTest.js'></script>
-  <link rel='stylesheet' type='text/css' href='/tests/SimpleTest/test.css'/>
-  -->
-  <script src='iframe-autoresize.js'></script>
+  <meta charset='utf-8'/>
+  <title>
+    WebGL Conformance Test Suite Single Test Wrapper
+  </title>
+  <link rel='stylesheet' type='text/css' href='iframe-passthrough.css'/>
 </head>
-<body style='margin:0'>
-
-<div>Status: <span id='status'>Initializing</span></div>
-<div>Path: <span id='path'>-</span></div>
-<div>Failures: <span id='results'>-</span></div>
-<hr/>
-<iframe style='border:none' id='test-frame' width='100%' scrolling='no'></iframe>
+<body>
+<iframe id='test-frame'></iframe>
 <script>
 'use strict';
 
-var statusElem = document.getElementById('status');
-var pathElem = document.getElementById('path');
-var resultsElem = document.getElementById('results');
 var frameElem = document.getElementById('test-frame');
 
-IFrameAutoresize.Start(frameElem, true);
-
 ////////////////////////////////////////////////////////////////////////
-// Forward SimpleTest functions and replace if missing.
 
-if (!window.ok) {
-  window.ok = parent.ok;
-}
-if (!window.todo) {
-  window.todo = parent.todo;
-}
-if (!window.SimpleTest) {
-  window.SimpleTest = parent.SimpleTest;
-}
-
-if (!window.ok) {
-  window.ok = function(status, message) {
-    console.log('ok(' + status + ', \'' + message + '\')');
-  }
-}
-if (!window.todo) {
-  window.todo = function(status, message) {
-    console.log('todo(' + status + ', \'' + message + '\')');
-  }
-}
-if (!window.SimpleTest) {
-  window.SimpleTest = {
-    expectAssertions: function(){},
-    finish: function(){},
-    requestFlakyTimeout: function(){},
-    requestLongerTimeout: function(){},
-    waitForExplicitFinish: function(){},
-  };
-}
-
-////////////////////////////////////////////////////////////////////////
-// Test running and harness.
-
-var gTestPath = null;
-var gIsComplete;
-
-function RunTest(testPath) {
-  console.log('testPath: ' + testPath);
-
-  gTestPath = testPath;
-  pathElem.innerHTML = gTestPath;
-
-  // Load the iframe.
-  statusElem.innerHTML = 'Loading';
-
-  gIsComplete = false;
-  frameElem.onload = function() {
-    if (!gIsComplete)
-      statusElem.innerHTML = 'Running';
-  };
-  frameElem.src = gTestPath;
-}
-
-var gFailureCount = 0;
-var gResultCount = 0;
 window.webglTestHarness = {
-  reportResults: function(success, message) {
-    ok(success, message);
-
-    gResultCount++;
-    if (!success) {
-      gFailureCount++;
+  reportResults: function(pathname, success, message) {
+    console.log('ok(' + success + ', \'' + message + '\')');
+    if (parent) {
+      parent.ok(success, message);
+    } else {
+      console.log('ok(' + success + ', \'' + message + '\')');
     }
-
-    var color = gFailureCount ? 'red' : 'green';
-
-    resultsElem.innerHTML = [
-      '<font color=\'' + color + '\'>',
-      '' + gFailureCount + '/' + gResultCount,
-      '</font>',
-    ].join('\n');
   },
 
   notifyFinished: function(testPath) {
-    OnTestComplete();
+    console.log('SimpleTest.finish()');
+    if (parent) {
+      parent.SimpleTest.finish();
+    } else {
+      console.log('SimpleTest.finish()');
+    }
   },
 };
 
-function OnTestComplete() {
-  statusElem.innerHTML = 'Complete';
-  gIsComplete = true;
+if (parent) {
+  parent.SimpleTest.waitForExplicitFinish();
+  parent.SimpleTest.requestFlakyTimeout('untriaged');
 
-  ok(!gFailureCount, 'Test path: ' + gTestPath);
-  SimpleTest.finish();
+  try {
+    if (navigator.appVersion.indexOf('Android') != -1) {
+      // From layout/tools/reftest/reftest.js:
+      var version = SpecialPowers.Services.sysinfo.getProperty('version');
+      var kAndroidVersion2_3 = 9;
+      if (version == kAndroidVersion2_3) {
+        var timeoutLengthMultiplier = 2.0;
+        parent.SimpleTest.requestLongerTimeout(timeoutLengthMultiplier);
+      }
+    }
+  } catch (e) {
+    console.log('Warning: No SpecialPowers.');
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////
-// Begin execution
 
-SimpleTest.waitForExplicitFinish();
-
-var needsLongerTimeout = false;
-try {
-  if (navigator.appVersion.indexOf('Android') != -1) {
-    // From layout/tools/reftest/reftest.js:
-    var version = SpecialPowers.Services.sysinfo.getProperty('version');
-    var kAndroidVersion2_3 = 9;
-    if (version == kAndroidVersion2_3) {
-      needsLongerTimeout = true;
-    }
-  }
-} catch (e) {
-  console.log('Warning: No SpecialPowers.');
-}
-
-if (needsLongerTimeout) {
-  var timeoutLengthMultiplier = 2.0;
-  SimpleTest.requestLongerTimeout(timeoutLengthMultiplier);
-}
-
-var arg = location.search.substr(1);
-RunTest(arg);
+var testPath = location.search.substr(1);
+console.log('testPath: ' + testPath);
+frameElem.src = testPath;
 
 </script>
 </body>

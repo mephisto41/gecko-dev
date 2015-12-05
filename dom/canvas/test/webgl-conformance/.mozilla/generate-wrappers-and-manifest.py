@@ -27,7 +27,7 @@ SUPPORT_DIRS = [
 
 EXTRA_SUPPORT_FILES = [
     'always-fail.html',
-    'iframe-autoresize.js',
+    'iframe-passthrough.css',
     'mochi-single.html',
 ]
 
