@@ -310,6 +310,7 @@ WebGLContext::GetParameter(JSContext* cx, GLenum pname, ErrorResult& rv)
             } else {
                 i = LOCAL_GL_UNSIGNED_BYTE;
             }
+
             return JS::NumberValue(uint32_t(i));
         }
         case LOCAL_GL_IMPLEMENTATION_COLOR_READ_FORMAT: {
@@ -330,6 +331,13 @@ WebGLContext::GetParameter(JSContext* cx, GLenum pname, ErrorResult& rv)
             } else {
                 i = LOCAL_GL_RGBA;
             }
+
+            // If internal format of fbo is SRGB8_ALPHA8, then
+            // IMPLEMENTATION_COLOR_READ_FORMAT is SRGB_ALPHA which is not supported
+            // by ReadPixels. So, just return RGBA here.
+            if (i == LOCAL_GL_SRGB_ALPHA)
+                i = LOCAL_GL_RGBA;
+
             return JS::NumberValue(uint32_t(i));
         }
         // int
