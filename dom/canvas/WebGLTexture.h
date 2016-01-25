@@ -117,6 +117,7 @@ public:
         const uint32_t mWidth;
         const uint32_t mHeight;
         const uint32_t mDepth;
+        const bool mIsUnsizedFormat;
 
     protected:
         bool mIsDataInitialized;
@@ -129,15 +130,17 @@ public:
             , mWidth(0)
             , mHeight(0)
             , mDepth(0)
+            , mIsUnsizedFormat(false)
             , mIsDataInitialized(false)
         { }
 
         ImageInfo(const webgl::FormatUsageInfo* format, uint32_t width, uint32_t height,
-                  uint32_t depth, bool isDataInitialized)
+                  uint32_t depth, bool isUnsizedFormat, bool isDataInitialized)
             : mFormat(format)
             , mWidth(width)
             , mHeight(height)
             , mDepth(depth)
+            , mIsUnsizedFormat(isUnsizedFormat)
             , mIsDataInitialized(isDataInitialized)
         {
             MOZ_ASSERT(mFormat);

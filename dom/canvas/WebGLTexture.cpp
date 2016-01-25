@@ -43,6 +43,7 @@ WebGLTexture::ImageInfo::Clear()
     Mutable(mWidth) = 0;
     Mutable(mHeight) = 0;
     Mutable(mDepth) = 0;
+    Mutable(mIsUnsizedFormat) = false;
 
     MOZ_ASSERT(!IsDefined());
 }
@@ -56,6 +57,7 @@ WebGLTexture::ImageInfo::operator =(const ImageInfo& a)
     Mutable(mWidth) = a.mWidth;
     Mutable(mHeight) = a.mHeight;
     Mutable(mDepth) = a.mDepth;
+    Mutable(mIsUnsizedFormat) = a.mIsUnsizedFormat;
 
     mIsDataInitialized = a.mIsDataInitialized;
 
@@ -654,6 +656,7 @@ WebGLTexture::PopulateMipChain(uint32_t firstLevel, uint32_t lastLevel)
         }
 
         const ImageInfo cur(baseImageInfo.mFormat, refWidth, refHeight, refDepth,
+                            baseImageInfo.mIsUnsizedFormat,
                             baseImageInfo.IsDataInitialized());
 
         SetImageInfosAtLevel(level, cur);
@@ -742,8 +745,15 @@ WebGLTexture::GenerateMipmap(TexTarget texTarget)
         return;
     }
 
-    if (!baseImageInfo.mFormat->isRenderable || !baseImageInfo.mFormat->isFilterable) {
-        mContext->ErrorInvalidOperation("generateMipmap: Texture at base level is not"
+    // OpenGL ES 3.0.4 p160:
+    // If the level base array was not specified with an unsized internal format from
+    // table 3.3 or a sized internal format that is both color-renderable and
+    // texture-filterable according to table 3.13, an INVALID_OPERATION error
+    // is generated.
+    if (!baseImageInfo.mIsUnsizedFormat &&
+        (!baseImageInfo.mFormat->isRenderable || !baseImageInfo.mFormat->isFilterable)) {
+        mContext->ErrorInvalidOperation("generateMipmap: Texture at base level is not unsized"
+                                        " internal format or is not"
                                         " color-renderable or texture-filterable.");
         return;
     }

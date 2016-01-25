@@ -998,7 +998,7 @@ WebGLTexture::TexStorage(const char* funcName, TexTarget target, GLsizei levels,
 
     const bool isDataInitialized = false;
     const WebGLTexture::ImageInfo newInfo(dstUsage, width, height, depth,
-                                          isDataInitialized);
+                                          false, isDataInitialized);
     SetImageInfosAtLevel(0, newInfo);
 
     PopulateMipChain(0, levels-1);
@@ -1029,6 +1029,7 @@ WebGLTexture::TexImage(const char* funcName, TexImageTarget target, GLint level,
 
     const auto& fua = mContext->mFormatUsage;
     auto dstUsage = fua->GetSizedTexUsage(internalFormat);
+    bool isUnsizedFormat = false;
     if (!dstUsage) {
         if (internalFormat != unpackFormat) {
             mContext->ErrorInvalidOperation("%s: Unsized internalFormat must match"
@@ -1038,6 +1039,7 @@ WebGLTexture::TexImage(const char* funcName, TexImageTarget target, GLint level,
         }
 
         dstUsage = fua->GetUnsizedTexUsage(srcPacking);
+        isUnsizedFormat = true;
     }
 
     if (!dstUsage) {
@@ -1108,7 +1110,7 @@ WebGLTexture::TexImage(const char* funcName, TexImageTarget target, GLint level,
     // slower.
 
     const ImageInfo newImageInfo(dstUsage, blob->mWidth, blob->mHeight, blob->mDepth,
-                                 blob->mHasData);
+                                 isUnsizedFormat, blob->mHasData);
 
     const bool isSubImage = false;
     const bool needsRespec = (imageInfo->mWidth  != newImageInfo.mWidth ||
@@ -1330,7 +1332,7 @@ WebGLTexture::CompressedTexImage(const char* funcName, TexImageTarget target, GL
     // Update our specification data.
 
     const bool isDataInitialized = true;
-    const ImageInfo newImageInfo(usage, width, height, depth, isDataInitialized);
+    const ImageInfo newImageInfo(usage, width, height, depth, false, isDataInitialized);
     SetImageInfo(imageInfo, newImageInfo);
 }
 
@@ -1714,6 +1716,7 @@ WebGLTexture::CopyTexImage2D(TexImageTarget target, GLint level, GLenum internal
     const auto& fua = mContext->mFormatUsage;
 
     auto dstUsage = fua->GetSizedTexUsage(internalFormat);
+    bool isUnsizedFormat = false;
     if (!dstUsage) {
         // It must be an unsized format then...
         webgl::PackingInfo pi = {internalFormat, 0};
@@ -1732,6 +1735,7 @@ WebGLTexture::CopyTexImage2D(TexImageTarget target, GLint level, GLenum internal
         }
 
         dstUsage = fua->GetUnsizedTexUsage(pi);
+        isUnsizedFormat = true;
     }
 
     if (!dstUsage) {
@@ -1815,7 +1819,8 @@ WebGLTexture::CopyTexImage2D(TexImageTarget target, GLint level, GLenum internal
     // Update our specification data.
 
     const bool isDataInitialized = true;
-    const ImageInfo newImageInfo(dstUsage, width, height, depth, isDataInitialized);
+    const ImageInfo newImageInfo(dstUsage, width, height, depth,
+                                 isUnsizedFormat, isDataInitialized);
     SetImageInfo(imageInfo, newImageInfo);
 }
 
