@@ -847,11 +847,11 @@ WebGLFramebuffer::PrecheckFramebufferStatus(nsCString* const out_info) const
     if (HasIncompleteAttachments(out_info))
         return LOCAL_GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
 
-    if (!mContext->IsWebGL2()) {
-        // INCOMPLETE_DIMENSIONS doesn't exist in GLES3.
-        if (!AllImageRectsMatch())
-            return LOCAL_GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS; // Inconsistent sizes
+    // INCOMPLETE_DIMENSIONS doesn't exist in GLES3.
+    if (!AllImageRectsMatch())
+        return LOCAL_GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS; // Inconsistent sizes
 
+    if (!mContext->IsWebGL2()) {
         const auto depthOrStencilCount = int(mDepthAttachment.IsDefined()) +
                                          int(mStencilAttachment.IsDefined()) +
                                          int(mDepthStencilAttachment.IsDefined());
