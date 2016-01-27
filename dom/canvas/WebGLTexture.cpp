@@ -742,8 +742,25 @@ WebGLTexture::GenerateMipmap(TexTarget texTarget)
         return;
     }
 
-    if (!baseImageInfo.mFormat->isRenderable || !baseImageInfo.mFormat->isFilterable) {
-        mContext->ErrorInvalidOperation("generateMipmap: Texture at base level is not"
+    // OpenGL ES 3.0.4 p160:
+    // If the level base array was not specified with an unsized internal format from
+    // table 3.3 or a sized internal format that is both color-renderable and
+    // texture-filterable according to table 3.13, an INVALID_OPERATION error
+    // is generated.
+    bool canGenerateMipmap = (baseImageInfo.mFormat->isRenderable &&
+                              baseImageInfo.mFormat->isFilterable);
+    switch (baseImageInfo.mFormat->format->effectiveFormat) {
+    case webgl::EffectiveFormat::Luminance8:
+    case webgl::EffectiveFormat::Alpha8:
+    case webgl::EffectiveFormat::Luminance8Alpha8:
+        // Non-color-renderable formats from Table 3.3.
+        canGenerateMipmap = true;
+        break;
+    }
+
+    if (!canGenerateMipmap) {
+        mContext->ErrorInvalidOperation("generateMipmap: Texture at base level is not unsized"
+                                        " internal format or is not"
                                         " color-renderable or texture-filterable.");
         return;
     }
