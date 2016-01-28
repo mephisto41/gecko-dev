@@ -21,14 +21,9 @@ WebGL2Context::ValidateBufferTarget(GLenum target, const char* info)
     case LOCAL_GL_ELEMENT_ARRAY_BUFFER:
     case LOCAL_GL_TRANSFORM_FEEDBACK_BUFFER:
     case LOCAL_GL_UNIFORM_BUFFER:
-        return true;
-
     case LOCAL_GL_PIXEL_PACK_BUFFER:
     case LOCAL_GL_PIXEL_UNPACK_BUFFER:
-        ErrorInvalidOperation("%s: PBOs are still under development, and are currently"
-                              " disabled.",
-                              info);
-        return false;
+        return true;
 
     default:
         ErrorInvalidEnumInfo(info, target);
