@@ -491,6 +491,28 @@ ImageEncoder::GetImageEncoder(nsAString& aType)
   return encoder.forget();
 }
 
+class EncoderThreadPoolTerminator final : public nsIObserver
+{
+  public:
+    NS_DECL_ISUPPORTS
+    explicit EncoderThreadPoolTerminator() {}
+
+    NS_IMETHODIMP Observe(nsISupports *, const char *topic, const char16_t *) override
+    {
+      NS_ASSERTION(!strcmp(topic, "xpcom-shutdown-threads"),
+                   "Unexpected topic");
+      if (ImageEncoder::sThreadPool) {
+        ImageEncoder::sThreadPool->Shutdown();
+        ImageEncoder::sThreadPool = nullptr;
+      }
+      return NS_OK;
+    }
+  private:
+    ~EncoderThreadPoolTerminator() {}
+};
+
+NS_IMPL_ISUPPORTS(EncoderThreadPoolTerminator, nsIObserver)
+
 /* static */
 nsresult
 ImageEncoder::EnsureThreadPool()
@@ -498,13 +520,11 @@ ImageEncoder::EnsureThreadPool()
   if (!sThreadPool) {
     nsCOMPtr<nsIThreadPool> threadPool = do_CreateInstance(NS_THREADPOOL_CONTRACTID);
     sThreadPool = threadPool;
-    if (!NS_IsMainThread()) {
-      NS_DispatchToMainThread(NS_NewRunnableFunction([]() -> void {
-        ClearOnShutdown(&sThreadPool);
-      }));
-    } else {
-      ClearOnShutdown(&sThreadPool);
-    }
+    nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
+    NS_ASSERTION(os, "do_GetService failed");
+    os->AddObserver(new EncoderThreadPoolTerminator(),
+                    "xpcom-shutdown-threads",
+                    false);
 
     const uint32_t kThreadLimit = 2;
     const uint32_t kIdleThreadLimit = 1;
