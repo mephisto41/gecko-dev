@@ -18,7 +18,6 @@ var frameElem = document.getElementById('test-frame');
 
 window.webglTestHarness = {
   reportResults: function(pathname, success, message) {
-    console.log('ok(' + success + ', \'' + message + '\')');
     if (parent) {
       parent.ok(success, message);
     } else {
@@ -27,7 +26,6 @@ window.webglTestHarness = {
   },
 
   notifyFinished: function(testPath) {
-    console.log('SimpleTest.finish()');
     if (parent) {
       parent.SimpleTest.finish();
     } else {

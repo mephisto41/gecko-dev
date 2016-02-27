@@ -37,13 +37,6 @@ ACCEPTABLE_ERRATA_KEYS = set([
   'subsuite',
 ])
 
-GENERATED_HEADER = '''\
-# This is a GENERATED FILE. Do not edit it directly.
-# Regenerated it by using `python generate-wrappers-and-manifest.py`.
-# Mark skipped tests in mochitest-errata.ini.
-# Mark failing tests in mochi-single.html.
-'''
-
 ########################################################################
 # GetTestList
 
@@ -362,7 +355,6 @@ def WriteManifest(wrapperPathStrList, supportPathStrList):
 
     # Fill the template.
     templateDict = {
-        'HEADER': GENERATED_HEADER,
         'DEFAULT_ERRATA': defaultSectionStr,
         'SUPPORT_FILES': supportFilesStr,
         'MANIFEST_TESTS': manifestTestsStr,
