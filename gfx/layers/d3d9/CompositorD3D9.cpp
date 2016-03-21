@@ -21,6 +21,8 @@
 namespace mozilla {
 namespace layers {
 
+static bool gAfterReset = false;
+
 using namespace mozilla::gfx;
 
 CompositorD3D9::CompositorD3D9(CompositorBridgeParent* aParent, nsIWidget *aWidget)
@@ -40,6 +42,10 @@ CompositorD3D9::~CompositorD3D9()
 bool
 CompositorD3D9::Initialize()
 {
+  if (gAfterReset) {
+    return false;
+  }
+
   bool force = gfxPrefs::LayersAccelerationForceEnabled();
 
   ScopedGfxFeatureReporter reporter("D3D9 Layers", force);
@@ -637,6 +643,7 @@ CompositorD3D9::CheckResetCount()
 bool
 CompositorD3D9::Ready()
 {
+  mDeviceManager = nullptr;
   if (mDeviceManager) {
     if (EnsureSwapChain()) {
       // We don't need to call VerifyReadyForRendering because that is
@@ -651,7 +658,7 @@ CompositorD3D9::Ready()
                "Shouldn't have any render targets around, they must be released before our device");
   mSwapChain = nullptr;
 
-  mDeviceManager = gfxWindowsPlatform::GetPlatform()->GetD3D9DeviceManager();
+  //mDeviceManager = gfxWindowsPlatform::GetPlatform()->GetD3D9DeviceManager();
   if (!mDeviceManager) {
     FailedToResetDevice();
     mParent->InvalidateRemoteLayers();
@@ -672,6 +679,7 @@ CompositorD3D9::FailedToResetDevice() {
   if (mFailedResetAttempts > 10) {
     mFailedResetAttempts = 0;
     gfxWindowsPlatform::GetPlatform()->D3D9DeviceReset();
+    gAfterReset = true;
   }
 }
 
