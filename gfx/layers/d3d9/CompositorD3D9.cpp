@@ -670,7 +670,8 @@ CompositorD3D9::FailedToResetDevice() {
   // 10 is a totally arbitrary number that we may want to increase or decrease
   // depending on how things behave in the wild.
   if (mFailedResetAttempts > 10) {
-    MOZ_CRASH("GFX: Unable to get a working D3D9 Compositor");
+    mFailedResetAttempts = 0;
+    gfxWindowsPlatform::GetPlatform()->D3D9DeviceReset();
   }
 }
 
