@@ -1376,6 +1376,7 @@ void
 gfxWindowsPlatform::OnDeviceManagerDestroy(DeviceManagerD3D9* aDeviceManager)
 {
   if (aDeviceManager == mDeviceManager) {
+    MutexAutoLock lock(mDeviceLock);
     mDeviceManager = nullptr;
   }
 }
@@ -1383,21 +1384,24 @@ gfxWindowsPlatform::OnDeviceManagerDestroy(DeviceManagerD3D9* aDeviceManager)
 IDirect3DDevice9*
 gfxWindowsPlatform::GetD3D9Device()
 {
-  DeviceManagerD3D9* manager = GetD3D9DeviceManager();
+  RefPtr<DeviceManagerD3D9> manager = GetD3D9DeviceManager();
   return manager ? manager->device() : nullptr;
 }
 
 void
 gfxWindowsPlatform::D3D9DeviceReset() {
+  MutexAutoLock lock(mDeviceLock);
   mDeviceManager = nullptr;
   mHasD3D9DeviceReset = true;
 }
 
-DeviceManagerD3D9*
+already_AddRefed<DeviceManagerD3D9>
 gfxWindowsPlatform::GetD3D9DeviceManager()
 {
   // We should only create the d3d9 device on the compositor thread
   // or we don't have a compositor thread.
+  RefPtr<DeviceManagerD3D9> result;
+  MutexAutoLock lock(mDeviceLock);
   if (!mDeviceManager &&
       (!gfxPlatform::UsesOffMainThreadCompositing() ||
        CompositorBridgeParent::IsInCompositorThread())) {
@@ -1408,7 +1412,8 @@ gfxWindowsPlatform::GetD3D9DeviceManager()
     }
   }
 
-  return mDeviceManager;
+  result = mDeviceManager;
+  return result.forget();
 }
 
 bool
