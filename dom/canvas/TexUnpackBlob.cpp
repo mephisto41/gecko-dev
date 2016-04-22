@@ -376,7 +376,7 @@ TexUnpackSurface::UploadDataSurface(bool isSubImage, WebGLContext* webgl,
 
     static const webgl::DriverUnpackInfo kInfoBGRA = {
         LOCAL_GL_BGRA,
-        LOCAL_GL_BGRA,
+        LOCAL_GL_RGBA,
         LOCAL_GL_UNSIGNED_BYTE,
     };
 
