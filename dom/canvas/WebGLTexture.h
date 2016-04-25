@@ -117,6 +117,7 @@ public:
         const uint32_t mWidth;
         const uint32_t mHeight;
         const uint32_t mDepth;
+        const GLenum mInternalFormat;
 
     protected:
         bool mIsDataInitialized;
@@ -129,15 +130,17 @@ public:
             , mWidth(0)
             , mHeight(0)
             , mDepth(0)
+            , mInternalFormat(LOCAL_GL_NONE)
             , mIsDataInitialized(false)
         { }
 
         ImageInfo(const webgl::FormatUsageInfo* format, uint32_t width, uint32_t height,
-                  uint32_t depth, bool isDataInitialized)
+                  uint32_t depth, GLenum internalFormat, bool isDataInitialized)
             : mFormat(format)
             , mWidth(width)
             , mHeight(height)
             , mDepth(depth)
+            , mInternalFormat(internalFormat)
             , mIsDataInitialized(isDataInitialized)
         {
             MOZ_ASSERT(mFormat);

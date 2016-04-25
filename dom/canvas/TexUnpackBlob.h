@@ -43,6 +43,7 @@ namespace webgl {
 
 struct PackingInfo;
 struct DriverUnpackInfo;
+bool SupportsBGRA(gl::GLContext* gl);
 
 class TexUnpackBlob
 {
@@ -52,12 +53,15 @@ public:
     const GLsizei mDepth;
     const bool mHasData;
 
+    GLenum mActualInternalFormat;
+
 protected:
     TexUnpackBlob(GLsizei width, GLsizei height, GLsizei depth, bool hasData)
         : mWidth(width)
         , mHeight(height)
         , mDepth(depth)
         , mHasData(hasData)
+        , mActualInternalFormat(LOCAL_GL_NONE)
     { }
 
 public:
@@ -153,7 +157,9 @@ protected:
                                   const webgl::DriverUnpackInfo* dui, GLint xOffset,
                                   GLint yOffset, GLint zOffset, GLsizei width,
                                   GLsizei height, gfx::DataSourceSurface* surf,
-                                  bool isSurfAlphaPremult, GLenum* const out_glError);
+                                  bool isSurfAlphaPremult,
+                                  GLenum* const out_internalFormat,
+                                  GLenum* const out_glError);
 };
 
 } // namespace webgl

@@ -654,6 +654,7 @@ WebGLTexture::PopulateMipChain(uint32_t firstLevel, uint32_t lastLevel)
         }
 
         const ImageInfo cur(baseImageInfo.mFormat, refWidth, refHeight, refDepth,
+                            baseImageInfo.mInternalFormat,
                             baseImageInfo.IsDataInitialized());
 
         SetImageInfosAtLevel(level, cur);

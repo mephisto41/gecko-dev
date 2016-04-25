@@ -999,6 +999,7 @@ WebGLTexture::TexStorage(const char* funcName, TexTarget target, GLsizei levels,
 
     const bool isDataInitialized = false;
     const WebGLTexture::ImageInfo newInfo(dstUsage, width, height, depth,
+                                          dstUsage->idealUnpack->internalFormat,
                                           isDataInitialized);
     SetImageInfosAtLevel(0, newInfo);
 
@@ -1124,14 +1125,11 @@ WebGLTexture::TexImage(const char* funcName, TexImageTarget target, GLint level,
     // It's tempting to do allocation first, and TexSubImage second, but this is generally
     // slower.
 
-    const ImageInfo newImageInfo(dstUsage, blob->mWidth, blob->mHeight, blob->mDepth,
-                                 blob->mHasData);
-
     const bool isSubImage = false;
-    const bool needsRespec = (imageInfo->mWidth  != newImageInfo.mWidth ||
-                              imageInfo->mHeight != newImageInfo.mHeight ||
-                              imageInfo->mDepth  != newImageInfo.mDepth ||
-                              imageInfo->mFormat != newImageInfo.mFormat);
+    const bool needsRespec = (imageInfo->mWidth  != blob->mWidth ||
+                              imageInfo->mHeight != blob->mHeight ||
+                              imageInfo->mDepth  != blob->mDepth ||
+                              imageInfo->mFormat != dstUsage);
     const GLint xOffset = 0;
     const GLint yOffset = 0;
     const GLint zOffset = 0;
@@ -1139,6 +1137,9 @@ WebGLTexture::TexImage(const char* funcName, TexImageTarget target, GLint level,
     GLenum glError;
     blob->TexOrSubImage(isSubImage, needsRespec, funcName, this, target, level,
                         driverUnpackInfo, xOffset, yOffset, zOffset, &glError);
+
+    const ImageInfo newImageInfo(dstUsage, blob->mWidth, blob->mHeight, blob->mDepth,
+                                 blob->mActualInternalFormat, blob->mHasData);
 
     if (glError == LOCAL_GL_OUT_OF_MEMORY) {
         mContext->ErrorOutOfMemory("%s: Driver ran out of memory during upload.",
@@ -1236,9 +1237,20 @@ WebGLTexture::TexSubImage(const char* funcName, TexImageTarget target, GLint lev
     const bool isSubImage = true;
     const bool needsRespec = false;
 
+    auto chosenDUI = driverUnpackInfo;
+    static const webgl::DriverUnpackInfo kInfoBGRA = {
+        LOCAL_GL_BGRA,
+        LOCAL_GL_RGBA,
+        LOCAL_GL_UNSIGNED_BYTE,
+    };
+
+    if (webgl::SupportsBGRA(mContext->gl) && imageInfo->mInternalFormat == LOCAL_GL_BGRA) {
+        chosenDUI = &kInfoBGRA;
+    }
+
     GLenum glError;
     blob->TexOrSubImage(isSubImage, needsRespec, funcName, this, target, level,
-                        driverUnpackInfo, xOffset, yOffset, zOffset, &glError);
+                        chosenDUI, xOffset, yOffset, zOffset, &glError);
 
     if (glError == LOCAL_GL_OUT_OF_MEMORY) {
         mContext->ErrorOutOfMemory("%s: Driver ran out of memory during upload.",
@@ -1345,7 +1357,8 @@ WebGLTexture::CompressedTexImage(const char* funcName, TexImageTarget target, GL
     // Update our specification data.
 
     const bool isDataInitialized = true;
-    const ImageInfo newImageInfo(usage, width, height, depth, isDataInitialized);
+    const ImageInfo newImageInfo(usage, width, height, depth,
+                                 internalFormat, isDataInitialized);
     SetImageInfo(imageInfo, newImageInfo);
 }
 
@@ -1795,10 +1808,12 @@ WebGLTexture::CopyTexImage2D(TexImageTarget target, GLint level, GLenum internal
     Intersect(srcHeight, y, height, &readY, &writeY, &rwHeight);
 
     GLenum error;
+    GLenum actualInternalFormat;
     if (rwWidth == uint32_t(width) && rwHeight == uint32_t(height)) {
         MOZ_ASSERT(dstUsage->idealUnpack);
         error = DoCopyTexImage2D(gl, target, level, dstUsage->idealUnpack->internalFormat, x, y, width, height,
                                  border);
+        actualInternalFormat = dstUsage->idealUnpack->internalFormat;
     } else {
         // 1. Zero the texture data.
         // 2. CopyTexSubImage the subrect.
@@ -1821,6 +1836,7 @@ WebGLTexture::CopyTexImage2D(TexImageTarget target, GLint level, GLenum internal
 
         error = DoCopyTexSubImage(gl, target, level, writeX, writeY, zOffset, readX,
                                   readY, rwWidth, rwHeight);
+        actualInternalFormat = imageInfo->mInternalFormat;
     }
 
     if (error == LOCAL_GL_OUT_OF_MEMORY) {
@@ -1841,7 +1857,8 @@ WebGLTexture::CopyTexImage2D(TexImageTarget target, GLint level, GLenum internal
     // Update our specification data.
 
     const bool isDataInitialized = true;
-    const ImageInfo newImageInfo(dstUsage, width, height, depth, isDataInitialized);
+    const ImageInfo newImageInfo(dstUsage, width, height, depth,
+                                 actualInternalFormat, isDataInitialized);
     SetImageInfo(imageInfo, newImageInfo);
 }
 

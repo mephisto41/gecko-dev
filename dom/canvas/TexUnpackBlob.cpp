@@ -233,6 +233,7 @@ TexUnpackBytes::TexOrSubImage(bool isSubImage, bool needsRespec, const char* fun
 
     GLenum error = DoTexOrSubImage(isSubImage, gl, target, level, dui, xOffset, yOffset,
                                    zOffset, mWidth, mHeight, mDepth, uploadBytes);
+    mActualInternalFormat = dui->internalFormat;
     *out_glError = error;
 }
 
@@ -315,6 +316,7 @@ TexUnpackImage::TexOrSubImage(bool isSubImage, bool needsRespec, const char* fun
 
     surfBlob.TexOrSubImage(isSubImage, needsRespec, funcName, tex, target, level, dui,
                            xOffset, yOffset, zOffset, out_glError);
+    mActualInternalFormat = surfBlob.mActualInternalFormat;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -339,7 +341,7 @@ GuessAlignment(const void* data, size_t bytesPerRow, size_t stride, size_t maxAl
     return false;
 }
 
-static bool
+bool
 SupportsBGRA(gl::GLContext* gl)
 {
     if (gl->IsANGLE())
@@ -354,7 +356,9 @@ TexUnpackSurface::UploadDataSurface(bool isSubImage, WebGLContext* webgl,
                                     const webgl::DriverUnpackInfo* dui, GLint xOffset,
                                     GLint yOffset, GLint zOffset, GLsizei width,
                                     GLsizei height, gfx::DataSourceSurface* surf,
-                                    bool isSurfAlphaPremult, GLenum* const out_glError)
+                                    bool isSurfAlphaPremult,
+                                    GLenum* const out_internalFormat,
+                                    GLenum* const out_glError)
 {
     gl::GLContext* gl = webgl->GL();
     MOZ_ASSERT(gl->IsCurrent());
@@ -376,7 +380,7 @@ TexUnpackSurface::UploadDataSurface(bool isSubImage, WebGLContext* webgl,
 
     static const webgl::DriverUnpackInfo kInfoBGRA = {
         LOCAL_GL_BGRA,
-        LOCAL_GL_RGBA,
+        LOCAL_GL_BGRA,
         LOCAL_GL_UNSIGNED_BYTE,
     };
 
@@ -446,6 +450,8 @@ TexUnpackSurface::UploadDataSurface(bool isSubImage, WebGLContext* webgl,
         *out_glError = error;
         return false;
     }
+
+    *out_internalFormat = chosenDUI->internalFormat;
 
     return true;
 }
@@ -766,7 +772,8 @@ TexUnpackSurface::TexOrSubImage(bool isSubImage, bool needsRespec, const char* f
 
     GLenum error;
     if (UploadDataSurface(isSubImage, webgl, target, level, dui, xOffset, yOffset,
-                          zOffset, mWidth, mHeight, dataSurf, mIsAlphaPremult, &error))
+                          zOffset, mWidth, mHeight, dataSurf, mIsAlphaPremult,
+                          &mActualInternalFormat, &error))
     {
         return;
     }
@@ -799,6 +806,7 @@ TexUnpackSurface::TexOrSubImage(bool isSubImage, bool needsRespec, const char* f
     error = DoTexOrSubImage(isSubImage, webgl->gl, target.get(), level, dui, xOffset,
                             yOffset, zOffset, mWidth, mHeight, mDepth,
                             convertedBuffer.get());
+    mActualInternalFormat = dui->internalFormat;
     *out_glError = error;
 }
 
