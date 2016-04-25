@@ -56,6 +56,7 @@ WebGLTexture::ImageInfo::operator =(const ImageInfo& a)
     Mutable(mWidth) = a.mWidth;
     Mutable(mHeight) = a.mHeight;
     Mutable(mDepth) = a.mDepth;
+    Mutable(mInternalFormat) = a.mInternalFormat;
 
     mIsDataInitialized = a.mIsDataInitialized;
 

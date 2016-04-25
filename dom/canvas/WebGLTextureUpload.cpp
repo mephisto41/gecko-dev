@@ -1237,20 +1237,9 @@ WebGLTexture::TexSubImage(const char* funcName, TexImageTarget target, GLint lev
     const bool isSubImage = true;
     const bool needsRespec = false;
 
-    auto chosenDUI = driverUnpackInfo;
-    static const webgl::DriverUnpackInfo kInfoBGRA = {
-        LOCAL_GL_BGRA,
-        LOCAL_GL_RGBA,
-        LOCAL_GL_UNSIGNED_BYTE,
-    };
-
-    if (webgl::SupportsBGRA(mContext->gl) && imageInfo->mInternalFormat == LOCAL_GL_BGRA) {
-        chosenDUI = &kInfoBGRA;
-    }
-
     GLenum glError;
     blob->TexOrSubImage(isSubImage, needsRespec, funcName, this, target, level,
-                        chosenDUI, xOffset, yOffset, zOffset, &glError);
+                        driverUnpackInfo, xOffset, yOffset, zOffset, &glError);
 
     if (glError == LOCAL_GL_OUT_OF_MEMORY) {
         mContext->ErrorOutOfMemory("%s: Driver ran out of memory during upload.",

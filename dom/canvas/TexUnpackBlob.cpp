@@ -136,6 +136,15 @@ FormatFromPacking(const webgl::PackingInfo& pi)
     return WebGLTexelFormat::FormatNotSupportingAnyConversion;
 }
 
+static bool
+SupportsBGRA(gl::GLContext* gl)
+{
+    if (gl->IsANGLE())
+        return true;
+
+    return false;
+}
+
 void
 TexUnpackBytes::TexOrSubImage(bool isSubImage, bool needsRespec, const char* funcName,
                               WebGLTexture* tex, TexImageTarget target, GLint level,
@@ -231,7 +240,19 @@ TexUnpackBytes::TexOrSubImage(bool isSubImage, bool needsRespec, const char* fun
         uploadBytes = tempBuffer.get();
     } while (false);
 
-    GLenum error = DoTexOrSubImage(isSubImage, gl, target, level, dui, xOffset, yOffset,
+    static const webgl::DriverUnpackInfo kInfoBGRA = {
+        LOCAL_GL_BGRA,
+        LOCAL_GL_BGRA,
+        LOCAL_GL_UNSIGNED_BYTE,
+    };
+
+    const webgl::DriverUnpackInfo* chosenDUI = dui;
+    WebGLTexture::ImageInfo& imageInfo = tex->ImageInfoAt(target, level);
+    if (SupportsBGRA(gl) && imageInfo.mInternalFormat == LOCAL_GL_BGRA) {
+        chosenDUI = &kInfoBGRA;
+    }
+
+    GLenum error = DoTexOrSubImage(isSubImage, gl, target, level, chosenDUI, xOffset, yOffset,
                                    zOffset, mWidth, mHeight, mDepth, uploadBytes);
     mActualInternalFormat = dui->internalFormat;
     *out_glError = error;
@@ -338,15 +359,6 @@ GuessAlignment(const void* data, size_t bytesPerRow, size_t stride, size_t maxAl
         }
         alignmentGuess /= 2;
     }
-    return false;
-}
-
-bool
-SupportsBGRA(gl::GLContext* gl)
-{
-    if (gl->IsANGLE())
-        return true;
-
     return false;
 }
 

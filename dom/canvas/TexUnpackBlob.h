@@ -43,7 +43,6 @@ namespace webgl {
 
 struct PackingInfo;
 struct DriverUnpackInfo;
-bool SupportsBGRA(gl::GLContext* gl);
 
 class TexUnpackBlob
 {
