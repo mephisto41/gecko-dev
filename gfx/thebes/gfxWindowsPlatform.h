@@ -231,7 +231,7 @@ public:
     { return mRenderingParams[aRenderMode]; }
 
     void OnDeviceManagerDestroy(mozilla::layers::DeviceManagerD3D9* aDeviceManager);
-    already_AddRefed<mozilla::layers::DeviceManagerD3D9> GetD3D9DeviceManager();
+    mozilla::layers::DeviceManagerD3D9* GetD3D9DeviceManager();
     IDirect3DDevice9* GetD3D9Device();
     void D3D9DeviceReset();
     ID3D11Device *GetD3D11Device();
