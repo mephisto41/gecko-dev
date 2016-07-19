@@ -52,12 +52,9 @@ public:
                       const ReflowInput& aReflowInput,
                       nsReflowStatus&          aStatus) override;
 
-  /**
-   * Table columns never paint anything, nor receive events.
-   */
   virtual void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
                                 const nsRect&           aDirtyRect,
-                                const nsDisplayListSet& aLists) override {}
+                                const nsDisplayListSet& aLists) override;
 
   /**
    * Get the "type" of the frame
