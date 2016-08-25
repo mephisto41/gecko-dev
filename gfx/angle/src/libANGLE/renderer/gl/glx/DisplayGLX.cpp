@@ -725,12 +725,6 @@ egl::ConfigSet DisplayGLX::generateConfigs()
     return configs;
 }
 
-bool DisplayGLX::isDeviceLost() const
-{
-    // UNIMPLEMENTED();
-    return false;
-}
-
 bool DisplayGLX::testDeviceLost()
 {
     // UNIMPLEMENTED();
@@ -751,7 +745,7 @@ bool DisplayGLX::isValidNativeWindow(EGLNativeWindowType window) const
     // fail if the window doesn't exist (the rational is that these function
     // are used by window managers). Out of these function we use XQueryTree
     // as it seems to be the simplest; a drawback is that it will allocate
-    // memory for the list of children, becasue we use a child window for
+    // memory for the list of children, because we use a child window for
     // WindowSurface.
     Window root;
     Window parent;
@@ -933,6 +927,9 @@ egl::Error DisplayGLX::createContextAttribs(glx::FBConfig,
     // When creating a context with glXCreateContextAttribsARB, a variety of X11 errors can
     // be generated. To prevent these errors from crashing our process, we simply ignore
     // them and only look if GLXContext was created.
+    // Process all events before setting the error handler to avoid desynchronizing XCB instances
+    // (the error handler is NOT per-display).
+    XSync(mXDisplay, False);
     auto oldErrorHandler = XSetErrorHandler(IgnoreX11Errors);
     *context = mGLX.createContextAttribsARB(mContextConfig, nullptr, True, attribs.data());
     XSetErrorHandler(oldErrorHandler);

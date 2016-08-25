@@ -47,7 +47,6 @@
 #include "libANGLE/renderer/d3d/ShaderD3D.h"
 #include "libANGLE/renderer/d3d/SurfaceD3D.h"
 #include "libANGLE/renderer/d3d/TextureD3D.h"
-#include "libANGLE/renderer/d3d/TransformFeedbackD3D.h"
 #include "libANGLE/State.h"
 #include "libANGLE/Surface.h"
 #include "libANGLE/Texture.h"
@@ -1790,17 +1789,26 @@ gl::Error Renderer9::clear(const ClearParameters &clearParams,
         RenderTarget9 *colorRenderTarget9 = GetAs<RenderTarget9>(colorRenderTarget);
         ASSERT(colorRenderTarget9);
 
-        const gl::InternalFormat &formatInfo = gl::GetInternalFormatInfo(colorBuffer->getInternalFormat());
+        const gl::InternalFormat &formatInfo = *colorBuffer->getFormat().info;
         const d3d9::D3DFormat &d3dFormatInfo = d3d9::GetD3DFormatInfo(colorRenderTarget9->getD3DFormat());
 
-        color = D3DCOLOR_ARGB(gl::unorm<8>((formatInfo.alphaBits == 0 && d3dFormatInfo.alphaBits > 0) ? 1.0f : clearParams.colorFClearValue.alpha),
-                              gl::unorm<8>((formatInfo.redBits   == 0 && d3dFormatInfo.redBits   > 0) ? 0.0f : clearParams.colorFClearValue.red),
-                              gl::unorm<8>((formatInfo.greenBits == 0 && d3dFormatInfo.greenBits > 0) ? 0.0f : clearParams.colorFClearValue.green),
-                              gl::unorm<8>((formatInfo.blueBits  == 0 && d3dFormatInfo.blueBits  > 0) ? 0.0f : clearParams.colorFClearValue.blue));
+        color =
+            D3DCOLOR_ARGB(gl::unorm<8>((formatInfo.alphaBits == 0 && d3dFormatInfo.alphaBits > 0)
+                                           ? 1.0f
+                                           : clearParams.colorFClearValue.alpha),
+                          gl::unorm<8>((formatInfo.redBits == 0 && d3dFormatInfo.redBits > 0)
+                                           ? 0.0f
+                                           : clearParams.colorFClearValue.red),
+                          gl::unorm<8>((formatInfo.greenBits == 0 && d3dFormatInfo.greenBits > 0)
+                                           ? 0.0f
+                                           : clearParams.colorFClearValue.green),
+                          gl::unorm<8>((formatInfo.blueBits == 0 && d3dFormatInfo.blueBits > 0)
+                                           ? 0.0f
+                                           : clearParams.colorFClearValue.blue));
 
-        if ((formatInfo.redBits   > 0 && !clearParams.colorMaskRed) ||
+        if ((formatInfo.redBits > 0 && !clearParams.colorMaskRed) ||
             (formatInfo.greenBits > 0 && !clearParams.colorMaskGreen) ||
-            (formatInfo.blueBits  > 0 && !clearParams.colorMaskBlue) ||
+            (formatInfo.blueBits > 0 && !clearParams.colorMaskBlue) ||
             (formatInfo.alphaBits > 0 && !clearParams.colorMaskAlpha))
         {
             needMaskedColorClear = true;
@@ -2331,6 +2339,21 @@ gl::Error Renderer9::copyImage2DArray(const gl::Framebuffer *framebuffer, const 
     return gl::Error(GL_INVALID_OPERATION);
 }
 
+gl::Error Renderer9::copyTexture(const gl::Texture *source,
+                                 GLint sourceLevel,
+                                 const gl::Rectangle &sourceRect,
+                                 GLenum destFormat,
+                                 const gl::Offset &destOffset,
+                                 TextureStorage *storage,
+                                 GLint destLevel,
+                                 bool unpackFlipY,
+                                 bool unpackPremultiplyAlpha,
+                                 bool unpackUnmultiplyAlpha)
+{
+    UNIMPLEMENTED();
+    return gl::Error(GL_INVALID_OPERATION);
+}
+
 gl::Error Renderer9::createRenderTarget(int width, int height, GLenum format, GLsizei samples, RenderTargetD3D **outRT)
 {
     const d3d9::TextureFormat &d3d9FormatInfo = d3d9::GetTextureFormatInfo(format);
@@ -2636,9 +2659,10 @@ TextureStorage *Renderer9::createTextureStorage2D(SwapChainD3D *swapChain)
     return new TextureStorage9_2D(this, swapChain9);
 }
 
-TextureStorage *Renderer9::createTextureStorageEGLImage(EGLImageD3D *eglImage)
+TextureStorage *Renderer9::createTextureStorageEGLImage(EGLImageD3D *eglImage,
+                                                        RenderTargetD3D *renderTargetD3D)
 {
-    return new TextureStorage9_EGLImage(this, eglImage);
+    return new TextureStorage9_EGLImage(this, eglImage, GetAs<RenderTarget9>(renderTargetD3D));
 }
 
 TextureStorage *Renderer9::createTextureStorageExternal(

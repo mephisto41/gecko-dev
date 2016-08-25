@@ -16,6 +16,11 @@
 
 #include "libANGLE/angletypes.h"
 
+namespace angle
+{
+struct Format;
+}
+
 namespace gl
 {
 struct FormatType;
@@ -24,6 +29,16 @@ struct InternalFormat;
 
 namespace rx
 {
+
+using MipGenerationFunction = void (*)(size_t sourceWidth,
+                                       size_t sourceHeight,
+                                       size_t sourceDepth,
+                                       const uint8_t *sourceData,
+                                       size_t sourceRowPitch,
+                                       size_t sourceDepthPitch,
+                                       uint8_t *destData,
+                                       size_t destRowPitch,
+                                       size_t destDepthPitch);
 
 typedef void (*ColorReadFunction)(const uint8_t *source, uint8_t *dest);
 typedef void (*ColorWriteFunction)(const uint8_t *source, uint8_t *dest);
@@ -51,9 +66,7 @@ struct PackPixelsParams
 };
 
 void PackPixels(const PackPixelsParams &params,
-                const gl::InternalFormat &sourceFormatInfo,
-                const FastCopyFunctionMap &fastCopyFunctionsMap,
-                ColorReadFunction colorReadFunction,
+                const angle::Format &sourceFormat,
                 int inputPitch,
                 const uint8_t *source,
                 uint8_t *destination);
