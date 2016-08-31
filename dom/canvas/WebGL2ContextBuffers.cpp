@@ -193,6 +193,7 @@ WebGL2Context::GetBufferSubData(GLenum target, GLintptr offset,
     // feedback object is currently active, an INVALID_OPERATION error
     // is generated.
     WebGLTransformFeedback* currentTF = mBoundTransformFeedback;
+    GLenum newTarget = target;
     if (target == LOCAL_GL_TRANSFORM_FEEDBACK_BUFFER && currentTF) {
         if (currentTF->mIsActive) {
             ErrorInvalidOperation("%s: Currently bound transform feedback is active.",
@@ -208,8 +209,8 @@ WebGL2Context::GetBufferSubData(GLenum target, GLintptr offset,
         // objects are not active, but neither GLES3.0 nor OpenGL 4.5
         // spec guarantees this - just being bound for transform
         // feedback is sufficient to cause undefined results.
-
-        BindTransformFeedback(LOCAL_GL_TRANSFORM_FEEDBACK, nullptr);
+        newTarget = LOCAL_GL_ARRAY_BUFFER;
+        gl->fBindBuffer(newTarget, boundBuffer->mGLName);
     }
 
     /* If the buffer is written and read sequentially by other
@@ -219,16 +220,16 @@ WebGL2Context::GetBufferSubData(GLenum target, GLintptr offset,
      * bound to a transform feedback binding point.
      */
 
-    void* ptr = gl->fMapBufferRange(target, offset, data.LengthAllowShared(),
+    void* ptr = gl->fMapBufferRange(newTarget, offset, data.LengthAllowShared(),
                                     LOCAL_GL_MAP_READ_BIT);
     // Warning: Possibly shared memory.  See bug 1225033.
     memcpy(data.DataAllowShared(), ptr, data.LengthAllowShared());
-    gl->fUnmapBuffer(target);
+    gl->fUnmapBuffer(newTarget);
 
     ////
 
     if (target == LOCAL_GL_TRANSFORM_FEEDBACK_BUFFER && currentTF) {
-        BindTransformFeedback(LOCAL_GL_TRANSFORM_FEEDBACK, currentTF);
+        gl->fBindBuffer(LOCAL_GL_TRANSFORM_FEEDBACK_BUFFER, boundBuffer->mGLName);
     }
 }
 
