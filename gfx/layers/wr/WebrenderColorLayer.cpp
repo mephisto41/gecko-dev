@@ -6,7 +6,7 @@
 #include "WebrenderColorLayer.h"
 
 #include "LayersLogging.h"
-#include "webrender.h"
+#include "bindings.h"
 
 namespace mozilla {
 namespace layers {
