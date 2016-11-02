@@ -5,6 +5,9 @@ authors = ["nobody@mozilla.org"]
 license = "MPL-2.0"
 description = "Rust code for libxul"
 
+[features]
+webrender = ["gkrust-shared/webrender"]
+
 [dependencies]
 gkrust-shared = { path = "shared" }
 
