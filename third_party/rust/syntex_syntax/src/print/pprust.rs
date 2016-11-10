@@ -1893,8 +1893,10 @@ impl<'a> State<'a> {
             &fields[..],
             |s, field| {
                 try!(s.ibox(INDENT_UNIT));
-                try!(s.print_ident(field.ident.node));
-                try!(s.word_space(":"));
+                if !field.is_shorthand {
+                    try!(s.print_ident(field.ident.node));
+                    try!(s.word_space(":"));
+                }
                 try!(s.print_expr(&field.expr));
                 s.end()
             },
@@ -2275,7 +2277,7 @@ impl<'a> State<'a> {
                     Ok(())
                 }));
 
-                let mut options = vec!();
+                let mut options = vec![];
                 if a.volatile {
                     options.push("volatile");
                 }

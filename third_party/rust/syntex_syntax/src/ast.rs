@@ -161,12 +161,12 @@ impl Path {
         Path {
             span: s,
             global: false,
-            segments: vec!(
+            segments: vec![
                 PathSegment {
                     identifier: identifier,
                     parameters: PathParameters::none()
                 }
-            ),
+            ],
         }
     }
 }
@@ -477,7 +477,6 @@ pub type CrateConfig = Vec<P<MetaItem>>;
 pub struct Crate {
     pub module: Mod,
     pub attrs: Vec<Attribute>,
-    pub config: CrateConfig,
     pub span: Span,
     pub exported_macros: Vec<MacroDef>,
 }
@@ -900,6 +899,7 @@ pub struct Field {
     pub ident: SpannedIdent,
     pub expr: P<Expr>,
     pub span: Span,
+    pub is_shorthand: bool,
 }
 
 pub type SpannedIdent = Spanned<Ident>;
@@ -2012,8 +2012,6 @@ pub struct MacroDef {
     pub id: NodeId,
     pub span: Span,
     pub imported_from: Option<Ident>,
-    pub export: bool,
-    pub use_locally: bool,
     pub allow_internal_unstable: bool,
     pub body: Vec<TokenTree>,
 }

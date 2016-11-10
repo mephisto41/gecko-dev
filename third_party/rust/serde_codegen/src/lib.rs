@@ -171,9 +171,8 @@ macro_rules! shim {
 
             use syntax::parse;
             let name = stringify!($name).to_string();
-            let cfg = Vec::new();
             let sess = cx.parse_sess;
-            let impl_item = parse::parse_item_from_source_str(name, expanded, cfg, sess);
+            let impl_item = parse::parse_item_from_source_str(name, expanded, sess);
             push(::syntax::ext::base::Annotatable::Item(impl_item.unwrap().unwrap()));
         }
     };
@@ -194,7 +193,7 @@ pub fn expand_single_item(item: &str) -> Result<String, String> {
     let expanded_de = if de {
         Some(try!(de::expand_derive_deserialize(&syn_item)))
     } else {
-        None::<quote::Tokens>
+        None
     };
     let syn_item = post_expansion::strip_attrs_later(syn_item, &["serde"], "serde");
     return Ok(quote!(#expanded_ser #expanded_de #syn_item).to_string());

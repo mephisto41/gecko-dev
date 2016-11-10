@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use super::*;
 use super::internal::*;
 
@@ -48,12 +50,25 @@ pub fn check_map_exact_and_bounded() {
 }
 
 #[test]
-pub fn map_reduce() {
+pub fn map_sum() {
     let a: Vec<i32> = (0..1024).collect();
     let r1 = a.par_iter()
               .weight_max()
               .map(|&i| i + 1)
               .sum();
+    let r2 = a.iter()
+              .map(|&i| i + 1)
+              .fold(0, |a,b| a+b);
+    assert_eq!(r1, r2);
+}
+
+#[test]
+pub fn map_reduce() {
+    let a: Vec<i32> = (0..1024).collect();
+    let r1 = a.par_iter()
+              .weight_max()
+              .map(|&i| i + 1)
+              .reduce(|| 0, |i, j| i + j);
     let r2 = a.iter()
               .map(|&i| i + 1)
               .fold(0, |a,b| a+b);
@@ -70,33 +85,32 @@ pub fn map_reduce_with() {
     let r2 = a.iter()
               .map(|&i| i + 1)
               .fold(0, |a,b| a+b);
-    assert_eq!(r1.unwrap(), r2);
+    assert_eq!(r1, Some(r2));
 }
 
 #[test]
-pub fn map_reduce_with_identity() {
-    let a: Vec<i32> = (0..1024).collect();
-    let r1 = a.par_iter()
-              .weight_max()
-              .map(|&i| i + 1)
-              .reduce_with_identity(0, |i, j| i + j);
-    let r2 = a.iter()
-              .map(|&i| i + 1)
-              .fold(0, |a,b| a+b);
-    assert_eq!(r1, r2);
-}
-
-#[test]
-pub fn map_reduce_weighted() {
-    let a: Vec<i32> = (0..1024).collect();
-    let r1 = a.par_iter()
-              .map(|&i| i + 1)
-              .weight(2.0)
-              .reduce_with(|i, j| i + j);
-    let r2 = a.iter()
-              .map(|&i| i + 1)
-              .fold(0, |a,b| a+b);
-    assert_eq!(r1.unwrap(), r2);
+pub fn fold_map_reduce() {
+    // Kind of a weird test, but it demonstrates various
+    // transformations that are taking place. Relies on
+    // `weight_max().fold()` being equivalent to `map()`.
+    //
+    // Take each number from 0 to 32 and fold them by appending to a
+    // vector.  Because of `weight_max`, this will produce 32 vectors,
+    // each with one item.  We then collect all of these into an
+    // individual vector by mapping each into their own vector (so we
+    // have Vec<Vec<i32>>) and then reducing those into a single
+    // vector.
+    let r1 = (0_i32..32).into_par_iter()
+                        .weight_max()
+                        .fold(|| vec![], |mut v, e| { v.push(e); v })
+                        .map(|v| vec![v])
+                        .reduce_with(|mut v_a, v_b| { v_a.extend(v_b); v_a });
+    assert_eq!(r1,
+               Some(vec![vec![0], vec![1], vec![2], vec![3], vec![4], vec![5], vec![6], vec![7],
+                         vec![8], vec![9], vec![10], vec![11], vec![12], vec![13], vec![14],
+                         vec![15], vec![16], vec![17], vec![18], vec![19], vec![20], vec![21],
+                         vec![22], vec![23], vec![24], vec![25], vec![26], vec![27], vec![28],
+                         vec![29], vec![30], vec![31]]));
 }
 
 #[test]
@@ -575,4 +589,57 @@ pub fn check_chain() {
         .weight_max()
         .sum();
     assert_eq!(sum, 2500);
+}
+
+
+#[test]
+pub fn check_count() {
+    let c0 = (0_u32..24*1024).filter(|i| i % 2 == 0).count();
+    let c1 = (0_u32..24*1024).into_par_iter().filter(|i| i % 2 == 0).count();
+    let c2 = (0_u32..24*1024).into_par_iter().weight_max().filter(|i| i % 2 == 0).count();
+    assert_eq!(c0, c1);
+    assert_eq!(c1, c2);
+}
+
+
+#[test]
+pub fn find_any() {
+    let a: Vec<i32> = (0..1024).collect();
+
+    assert!(a.par_iter().find_any(|&&x| x % 42 == 41).is_some());
+    assert_eq!(a.par_iter().find_any(|&&x| x % 19 == 1 && x % 53 == 0), Some(&742_i32));
+    assert_eq!(a.par_iter().find_any(|&&x| x < 0), None);
+
+    assert!(a.par_iter().position_any(|&x| x % 42 == 41).is_some());
+    assert_eq!(a.par_iter().position_any(|&x| x % 19 == 1 && x % 53 == 0), Some(742_usize));
+    assert_eq!(a.par_iter().position_any(|&x| x < 0), None);
+
+    assert!(a.par_iter().any(|&x| x > 1000));
+    assert!(!a.par_iter().any(|&x| x < 0));
+
+    assert!(!a.par_iter().all(|&x| x > 1000));
+    assert!(a.par_iter().all(|&x| x >= 0));
+}
+
+#[test]
+pub fn check_find_not_present() {
+    let counter = AtomicUsize::new(0);
+    let value: Option<i32> =
+        (0_i32..2048)
+        .into_par_iter()
+        .find_any(|&p| { counter.fetch_add(1, Ordering::SeqCst); p >= 2048 });
+    assert!(value.is_none());
+    assert!(counter.load(Ordering::SeqCst) == 2048); // should have visited every single one
+}
+
+#[test]
+pub fn check_find_is_present() {
+    let counter = AtomicUsize::new(0);
+    let value: Option<i32> =
+        (0_i32..2048)
+        .into_par_iter()
+        .find_any(|&p| { counter.fetch_add(1, Ordering::SeqCst); p >= 1024 && p < 1096 });
+    let q = value.unwrap();
+    assert!(q >= 1024 && q < 1096);
+    assert!(counter.load(Ordering::SeqCst) < 2048); // should not have visited every single one
 }

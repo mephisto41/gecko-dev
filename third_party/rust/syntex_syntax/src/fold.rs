@@ -823,11 +823,12 @@ pub fn noop_fold_struct_field<T: Folder>(f: StructField, fld: &mut T) -> StructF
     }
 }
 
-pub fn noop_fold_field<T: Folder>(Field {ident, expr, span}: Field, folder: &mut T) -> Field {
+pub fn noop_fold_field<T: Folder>(f: Field, folder: &mut T) -> Field {
     Field {
-        ident: respan(ident.span, folder.fold_ident(ident.node)),
-        expr: folder.fold_expr(expr),
-        span: folder.new_span(span)
+        ident: respan(f.ident.span, folder.fold_ident(f.ident.node)),
+        expr: folder.fold_expr(f.expr),
+        span: folder.new_span(f.span),
+        is_shorthand: f.is_shorthand,
     }
 }
 
@@ -971,10 +972,8 @@ pub fn noop_fold_mod<T: Folder>(Mod {inner, items}: Mod, folder: &mut T) -> Mod 
     }
 }
 
-pub fn noop_fold_crate<T: Folder>(Crate {module, attrs, config, mut exported_macros, span}: Crate,
+pub fn noop_fold_crate<T: Folder>(Crate {module, attrs, mut exported_macros, span}: Crate,
                                   folder: &mut T) -> Crate {
-    let config = folder.fold_meta_items(config);
-
     let mut items = folder.fold_item(P(ast::Item {
         ident: keywords::Invalid.ident(),
         attrs: attrs,
@@ -1008,7 +1007,6 @@ pub fn noop_fold_crate<T: Folder>(Crate {module, attrs, config, mut exported_mac
     Crate {
         module: module,
         attrs: attrs,
-        config: config,
         exported_macros: exported_macros,
         span: span,
     }

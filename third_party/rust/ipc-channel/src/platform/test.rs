@@ -7,14 +7,16 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use libc;
-use platform::{self, OsIpcChannel, OsIpcReceiverSet, OsIpcSender, OsIpcOneShotServer};
+use platform::{self, OsIpcChannel, OsIpcReceiverSet};
 use platform::{OsIpcSharedMemory};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::thread;
 
-#[cfg(not(windows))]
+#[cfg(not(any(feature = "force-inprocess", target_os = "windows", target_os = "android")))]
+use libc;
+use platform::{OsIpcSender, OsIpcOneShotServer};
+#[cfg(not(any(feature = "force-inprocess", target_os = "windows", target_os = "android")))]
 use test::{fork, Wait};
 
 #[test]
@@ -173,6 +175,8 @@ fn big_data_with_sender_transfer() {
     thread.join().unwrap();
 }
 
+#[cfg(all(not(feature = "force-inprocess"), any(target_os = "linux",
+                                                target_os = "freebsd")))]
 fn with_n_fds(n: usize, size: usize) {
     let (sender_fds, receivers): (Vec<_>, Vec<_>) = (0..n).map(|_| platform::channel().unwrap())
                                                     .map(|(tx, rx)| (OsIpcChannel::Sender(tx), rx))
@@ -204,7 +208,8 @@ fn with_n_fds(n: usize, size: usize) {
 }
 
 // These tests only apply to platforms that need fragmentation.
-#[cfg(target_os="linux")]
+#[cfg(all(not(feature = "force-inprocess"), any(target_os = "linux",
+                                                target_os = "freebsd")))]
 mod fragment_tests {
     use platform;
     use super::with_n_fds;
@@ -392,14 +397,14 @@ fn receiver_set() {
     }
 }
 
+#[cfg(not(any(feature = "force-inprocess", target_os = "android")))]
 #[test]
-//XXXjdm This hangs indefinitely on appveyor and warrants further investigation.
-#[cfg(not(windows))]
-fn server() {
+fn server_accept_first() {
     let (server, name) = OsIpcOneShotServer::new().unwrap();
     let data: &[u8] = b"1234567";
 
     thread::spawn(move || {
+        thread::sleep(Duration::from_millis(30));
         let tx = OsIpcSender::connect(name).unwrap();
         tx.send(data, vec![], vec![]).unwrap();
     });
@@ -411,8 +416,25 @@ fn server() {
                (data, vec![], vec![]));
 }
 
-///XXXjdm Windows' libc doesn't include fork.
-#[cfg(not(windows))]
+#[test]
+fn server_connect_first() {
+    let (server, name) = OsIpcOneShotServer::new().unwrap();
+    let data: &[u8] = b"1234567";
+
+    thread::spawn(move || {
+        let tx = OsIpcSender::connect(name).unwrap();
+        tx.send(data, vec![], vec![]).unwrap();
+    });
+
+    thread::sleep(Duration::from_millis(30));
+    let (_, mut received_data, received_channels, received_shared_memory_regions) =
+        server.accept().unwrap();
+    received_data.truncate(7);
+    assert_eq!((&received_data[..], received_channels, received_shared_memory_regions),
+               (data, vec![], vec![]));
+}
+
+#[cfg(not(any(feature = "force-inprocess", target_os = "windows", target_os = "android")))]
 #[test]
 fn cross_process() {
     let (server, name) = OsIpcOneShotServer::new().unwrap();
@@ -432,8 +454,7 @@ fn cross_process() {
                (data, vec![], vec![]));
 }
 
-///XXXjdm Windows' libc doesn't include fork.
-#[cfg(not(windows))]
+#[cfg(not(any(feature = "force-inprocess", target_os = "windows", target_os = "android")))]
 #[test]
 fn cross_process_sender_transfer() {
     let (server, name) = OsIpcOneShotServer::new().unwrap();
@@ -606,5 +627,29 @@ fn try_recv_large_delayed() {
 
     for thread in threads {
         thread.join().unwrap();
+    }
+}
+
+#[cfg(feature = "unstable")]
+mod sync_test {
+    use platform;
+
+    trait SyncTest {
+        fn test_not_sync();
+    }
+
+    impl<T> SyncTest for T {
+        default fn test_not_sync() {}
+    }
+
+    impl<T: Sync> SyncTest for T {
+        fn test_not_sync() {
+            panic!("`OsIpcSender` should not be `Sync`");
+        }
+    }
+
+    #[test]
+    fn receiver_not_sync() {
+        platform::OsIpcSender::test_not_sync();
     }
 }
