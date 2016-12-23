@@ -8,7 +8,6 @@
 
 #include "CanvasClient.h"               // for CanvasClient, etc
 #include "ClientLayerManager.h"         // for ClientLayerManager, etc
-#include "CopyableCanvasLayer.h"        // for CopyableCanvasLayer
 #include "Layers.h"                     // for CanvasLayer, etc
 #include "mozilla/Attributes.h"         // for override
 #include "mozilla/RefPtr.h"             // for RefPtr
@@ -17,6 +16,7 @@
 #include "nsDebug.h"                    // for NS_ASSERTION
 #include "nsISupportsImpl.h"            // for MOZ_COUNT_CTOR, etc
 #include "nsRegion.h"                   // for nsIntRegion
+#include "ShareableCanvasLayer.h"
 
 namespace mozilla {
 namespace gl {
@@ -28,13 +28,13 @@ namespace layers {
 class CompositableClient;
 class ShadowableLayer;
 
-class ClientCanvasLayer : public CopyableCanvasLayer,
+class ClientCanvasLayer : public ShareableCanvasLayer,
                           public ClientLayer
 {
   typedef CanvasClient::CanvasClientType CanvasClientType;
 public:
   explicit ClientCanvasLayer(ClientLayerManager* aLayerManager) :
-    CopyableCanvasLayer(aLayerManager, static_cast<ClientLayer*>(this))
+    ShareableCanvasLayer(aLayerManager, static_cast<ClientLayer*>(this))
   {
     MOZ_COUNT_CTOR(ClientCanvasLayer);
   }
@@ -49,8 +49,6 @@ public:
                  "Can only set properties in construction phase");
     CanvasLayer::SetVisibleRegion(aRegion);
   }
-
-  virtual void Initialize(const Data& aData) override;
 
   virtual void RenderLayer() override;
 
@@ -90,32 +88,33 @@ public:
     mCanvasClient = nullptr;
   }
 
+  virtual CompositableForwarder* GetForwarder() override
+  {
+    return mManager->AsShadowForwarder();
+  }
+
   virtual CompositableClient* GetCompositableClient() override
   {
     return mCanvasClient;
   }
 
-  const TextureFlags& Flags() const { return mFlags; }
+  virtual void AttachCompositable() override
+  {
+    if (HasShadow()) {
+      if (mAsyncRenderer) {
+        static_cast<CanvasClientBridge*>(mCanvasClient.get())->SetLayer(this);
+      } else {
+        mCanvasClient->Connect();
+        ClientManager()->AsShadowForwarder()->Attach(mCanvasClient, this);
+      }
+    }
+  }
 
 protected:
-
-  bool UpdateTarget(gfx::DrawTarget* aDestTarget = nullptr);
-
   ClientLayerManager* ClientManager()
   {
     return static_cast<ClientLayerManager*>(mManager);
   }
-
-  CanvasClientType GetCanvasClientType();
-
-  RefPtr<CanvasClient> mCanvasClient;
-
-  UniquePtr<gl::SurfaceFactory> mFactory;
-
-  TextureFlags mFlags;
-
-  friend class CanvasClient2D;
-  friend class CanvasClientSharedSurface;
 };
 
 } // namespace layers
