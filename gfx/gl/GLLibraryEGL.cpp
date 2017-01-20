@@ -99,7 +99,7 @@ static PRLibrary* LoadApitraceLibrary()
 static PRLibrary*
 LoadLibraryForEGLOnWindows(const nsAString& filename)
 {
-    nsCOMPtr<nsIFile> file;
+    /*nsCOMPtr<nsIFile> file;
     nsresult rv = NS_GetSpecialDirectory(NS_GRE_DIR, getter_AddRefs(file));
     if (NS_FAILED(rv))
         return nullptr;
@@ -112,7 +112,12 @@ LoadLibraryForEGLOnWindows(const nsAString& filename)
                             NS_LossyConvertUTF16toASCII(filename).get());
         NS_WARNING(msg.get());
     }
-    return lib;
+    return lib;*/
+
+    PRLibSpec lspec;
+    lspec.type = PR_LibSpec_Pathname;
+    lspec.value.pathname = ToNewUTF8String(filename);
+    return PR_LoadLibraryWithFlags(lspec, PR_LD_LAZY | PR_LD_LOCAL);
 }
 
 #endif // XP_WIN
@@ -157,12 +162,12 @@ IsAccelAngleSupported(const nsCOMPtr<nsIGfxInfo>& gfxInfo,
 #endif
         return true;
     }
-    int32_t angleSupport;
+    int32_t angleSupport = nsIGfxInfo::FEATURE_STATUS_OK;
     nsCString failureId;
-    gfxUtils::ThreadSafeGetFeatureStatus(gfxInfo,
+    /*gfxUtils::ThreadSafeGetFeatureStatus(gfxInfo,
                                          nsIGfxInfo::FEATURE_WEBGL_ANGLE,
                                          failureId,
-                                         &angleSupport);
+                                         &angleSupport);*/
     if (failureId.IsEmpty() && angleSupport != nsIGfxInfo::FEATURE_STATUS_OK) {
         // This shouldn't happen, if we see this it's because we've missed
         // some failure paths
@@ -258,13 +263,13 @@ GetAndInitDisplayForAccelANGLE(GLLibraryEGL& egl, nsACString* const out_failureI
         //       will live longer than the ANGLE display so we're fine.
     });
 
-    if (gfxConfig::IsForcedOnByUser(Feature::D3D11_HW_ANGLE)) {
+    /*if (gfxConfig::IsForcedOnByUser(Feature::D3D11_HW_ANGLE)) {
         return GetAndInitDisplay(egl, LOCAL_EGL_D3D11_ONLY_DISPLAY_ANGLE);
-    }
+    }*/
 
-    if (d3d11ANGLE.IsEnabled()) {
+    //if (d3d11ANGLE.IsEnabled()) {
         ret = GetAndInitDisplay(egl, LOCAL_EGL_D3D11_ELSE_D3D9_DISPLAY_ANGLE);
-    }
+    //}
 
     if (!ret) {
         ret = GetAndInitDisplay(egl, EGL_DEFAULT_DISPLAY);

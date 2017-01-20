@@ -53,6 +53,7 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/layers/CompositorOptions.h"
 #include "mozilla/widget/CompositorWidget.h"
+#include "mozilla/widget/WinCompositorWidget.h"
 #include "nsDebug.h"
 #include "nsIWidget.h"
 #include "nsThreadUtils.h"
@@ -77,6 +78,8 @@ using namespace mozilla::widget;
 
 static bool
 CreateConfig(EGLConfig* aConfig);
+static bool
+CreateConfig(EGLConfig* aConfig, int32_t);
 
 // append three zeros at the end of attribs list to work around
 // EGL implementation bugs that iterate until they find 0, instead of
@@ -171,7 +174,7 @@ GLContextEGLFactory::Create(EGLNativeWindowType aWindow,
     bool doubleBuffered = true;
 
     EGLConfig config;
-    if (!CreateConfig(&config)) {
+    if (!CreateConfig(&config, 32)) {
         MOZ_CRASH("GFX: Failed to create EGLConfig!\n");
         return nullptr;
     }
@@ -718,7 +721,7 @@ already_AddRefed<GLContext>
 GLContextProviderEGL::CreateForCompositorWidget(CompositorWidget* aCompositorWidget, bool aForceAccelerated)
 {
     MOZ_ASSERT(aCompositorWidget);
-    return GLContextEGLFactory::Create(GET_NATIVE_WINDOW_FROM_COMPOSITOR_WIDGET(aCompositorWidget),
+    return GLContextEGLFactory::Create(aCompositorWidget->AsWindows()->GetHwnd(),
                                        aCompositorWidget->GetCompositorOptions().UseWebRender());
 }
 

@@ -87,11 +87,11 @@ pub fn read_buffer(mode: GLenum) {
 fn calculate_length(width: GLsizei, height: GLsizei, format: GLenum, pixel_type: GLenum) -> usize {
     let colors = match format {
         ffi::RGB => 3,
-#[cfg(not(target_os="android"))]
+#[cfg(not(any(target_os="android", target_os="windows")))]
         ffi::BGR => 3,
 
         ffi::RGBA => 4,
-#[cfg(not(target_os="android"))]
+#[cfg(not(any(target_os="android", target_os="windows")))]
         ffi::BGRA => 4,
 
         ffi::ALPHA => 1,
@@ -222,7 +222,7 @@ pub fn end_query(target: GLenum) {
     }
 }
 
-#[cfg(not(target_os="android"))]
+#[cfg(not(any(target_os="android", target_os="windows")))]
 #[inline]
 pub fn query_counter(id: GLuint, target: GLenum) {
     unsafe {
@@ -230,7 +230,7 @@ pub fn query_counter(id: GLuint, target: GLenum) {
     }
 }
 
-#[cfg(not(target_os="android"))]
+#[cfg(not(any(target_os="android", target_os="windows")))]
 #[inline]
 pub fn get_query_object_iv(id: GLuint, pname: GLenum) -> i32 {
     unsafe {
@@ -240,7 +240,7 @@ pub fn get_query_object_iv(id: GLuint, pname: GLenum) -> i32 {
     }
 }
 
-#[cfg(not(target_os="android"))]
+#[cfg(not(any(target_os="android", target_os="windows")))]
 #[inline]
 pub fn get_query_object_uiv(id: GLuint, pname: GLenum) -> u32 {
     unsafe {
@@ -250,7 +250,7 @@ pub fn get_query_object_uiv(id: GLuint, pname: GLenum) -> u32 {
     }
 }
 
-#[cfg(not(target_os="android"))]
+#[cfg(not(any(target_os="android", target_os="windows")))]
 #[inline]
 pub fn get_query_object_i64v(id: GLuint, pname: GLenum) -> i64 {
     unsafe {
@@ -260,7 +260,7 @@ pub fn get_query_object_i64v(id: GLuint, pname: GLenum) -> i64 {
     }
 }
 
-#[cfg(not(target_os="android"))]
+#[cfg(not(any(target_os="android", target_os="windows")))]
 #[inline]
 pub fn get_query_object_ui64v(id: GLuint, pname: GLenum) -> u64 {
     unsafe {
@@ -1173,7 +1173,7 @@ pub fn depth_mask(flag: bool) {
     }
 }
 
-#[cfg(not(target_os="android"))]
+#[cfg(not(any(target_os="android", target_os="windows")))]
 #[inline]
 pub fn depth_range(near: f64, far: f64) {
     unsafe {
@@ -1181,7 +1181,7 @@ pub fn depth_range(near: f64, far: f64) {
     }
 }
 
-#[cfg(target_os="android")]
+#[cfg(any(target_os="android", target_os="windows"))]
 #[inline]
 pub fn depth_range(near: f64, far: f64) {
     unsafe {
@@ -1392,7 +1392,7 @@ pub fn clear(buffer_mask: GLbitfield) {
     }
 }
 
-#[cfg(not(target_os="android"))]
+#[cfg(not(any(target_os="android", target_os="windows")))]
 #[inline]
 pub fn clear_depth(depth: f64) {
     unsafe {
@@ -1400,7 +1400,7 @@ pub fn clear_depth(depth: f64) {
     }
 }
 
-#[cfg(target_os="android")]
+#[cfg(any(target_os="android", target_os="windows"))]
 #[inline]
 pub fn clear_depth(depth: f64) {
     unsafe {
@@ -1508,7 +1508,7 @@ pub fn generate_mipmap(target: GLenum) {
 }
 
 #[inline]
-#[cfg(not(target_os="android"))]
+#[cfg(not(any(target_os="android", target_os="windows")))]
 pub fn insert_event_marker_ext(message: &str) {
     if ffi::InsertEventMarkerEXT::is_loaded() {
         unsafe {
@@ -1518,7 +1518,7 @@ pub fn insert_event_marker_ext(message: &str) {
 }
 
 #[inline]
-#[cfg(not(target_os="android"))]
+#[cfg(not(any(target_os="android", target_os="windows")))]
 pub fn push_group_marker_ext(message: &str) {
     if ffi::PushGroupMarkerEXT::is_loaded() {
         unsafe {
@@ -1528,7 +1528,7 @@ pub fn push_group_marker_ext(message: &str) {
 }
 
 #[inline]
-#[cfg(not(target_os="android"))]
+#[cfg(not(any(target_os="android", target_os="windows")))]
 pub fn pop_group_marker_ext() {
     if ffi::PopGroupMarkerEXT::is_loaded() {
         unsafe {

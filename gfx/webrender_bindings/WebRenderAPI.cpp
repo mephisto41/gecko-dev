@@ -40,7 +40,9 @@ public:
   {
     layers::AutoCompleteTask complete(mTask);
 
-    RefPtr<gl::GLContext> gl = gl::GLContextProvider::CreateForCompositorWidget(mCompositorWidget, true);
+    RefPtr<gl::GLContext> gl = gl::GLContextProviderEGL::CreateForCompositorWidget(mCompositorWidget, true);
+    MOZ_RELEASE_ASSERT(gl && gl->IsANGLE());
+    //RefPtr<gl::GLContext> gl = gl::GLContextProvider::CreateForCompositorWidget(mCompositorWidget, true);
     if (!gl || !gl->MakeCurrent()) {
       return;
     }
