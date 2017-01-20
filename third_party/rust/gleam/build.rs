@@ -20,6 +20,14 @@ fn main() {
             .unwrap();
 
         println!("cargo:rustc-link-lib=GLESv3");
+    } else if target.contains("windows") {
+        let extensions = ["GL_EXT_texture_format_BGRA8888"];
+        // GLES 2.0 bindings for Android
+        Registry::new(Api::Gles2, (3, 0), Profile::Core, Fallbacks::All, extensions)
+            .write_bindings(gl_generator::GlobalGenerator, &mut file)
+            .unwrap();
+
+        println!("cargo:rustc-link-lib=GLESv3");
     } else {
         let extensions = ["GL_ARB_texture_rectangle", "GL_EXT_debug_marker"];
         // OpenGL 3.3 bindings for Linux/Mac/Windows

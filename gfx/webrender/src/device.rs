@@ -27,16 +27,16 @@ const GL_FORMAT_A: gl::GLuint = gl::RED;
 #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
 const GL_FORMAT_A: gl::GLuint = gl::ALPHA;
 
-#[cfg(any(target_os = "windows", all(unix, not(target_os = "android"))))]
+#[cfg(not(any(target_os="android", target_os="windows")))]
 const GL_FORMAT_BGRA: gl::GLuint = gl::BGRA;
 
-#[cfg(target_os = "android")]
+#[cfg(any(target_os="android", target_os="windows"))]
 const GL_FORMAT_BGRA: gl::GLuint = gl::BGRA_EXT;
 
-#[cfg(not(any(target_arch = "arm", target_arch = "aarch64")))]
+#[cfg(not(any(target_os="android", target_os="windows")))]
 const SHADER_VERSION: &'static str = "#version 150\n";
 
-#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+#[cfg(any(target_os="android", target_os="windows"))]
 const SHADER_VERSION: &'static str = "#version 300 es\n";
 
 static SHADER_PREAMBLE: &'static str = "shared";
@@ -499,7 +499,7 @@ pub struct GpuFrameProfile<T> {
 }
 
 impl<T> GpuFrameProfile<T> {
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os="android", target_os="windows")))]
     fn new() -> GpuFrameProfile<T> {
         let queries = gl::gen_queries(MAX_EVENTS_PER_FRAME as gl::GLint);
 
@@ -511,7 +511,7 @@ impl<T> GpuFrameProfile<T> {
         }
     }
 
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os="android", target_os="windows"))]
     fn new() -> GpuFrameProfile<T> {
         GpuFrameProfile {
             queries: Vec::new(),
@@ -527,18 +527,18 @@ impl<T> GpuFrameProfile<T> {
         self.samples.clear();
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os="android", target_os="windows")))]
     fn end_frame(&mut self) {
         if self.pending_query != 0 {
             gl::end_query(gl::TIME_ELAPSED);
         }
     }
 
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os="android", target_os="windows"))]
     fn end_frame(&mut self) {
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os="android", target_os="windows")))]
     fn add_marker(&mut self, tag: T) -> GpuMarker
     where T: NamedTag {
         if self.pending_query != 0 {
@@ -562,7 +562,7 @@ impl<T> GpuFrameProfile<T> {
         marker
     }
 
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os="android", target_os="windows"))]
     fn add_marker(&mut self, tag: T) {
         self.samples.push(GpuSample {
             tag: tag,
@@ -574,7 +574,7 @@ impl<T> GpuFrameProfile<T> {
         self.next_query <= MAX_EVENTS_PER_FRAME
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os="android", target_os="windows")))]
     fn build_samples(&mut self) -> Vec<GpuSample<T>> {
         for (index, sample) in self.samples.iter_mut().enumerate() {
             sample.time_ns = gl::get_query_object_ui64v(self.queries[index], gl::QUERY_RESULT)
@@ -583,19 +583,19 @@ impl<T> GpuFrameProfile<T> {
         mem::replace(&mut self.samples, Vec::new())
     }
 
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os="android", target_os="windows"))]
     fn build_samples(&mut self) -> Vec<GpuSample<T>> {
         mem::replace(&mut self.samples, Vec::new())
     }
 }
 
 impl<T> Drop for GpuFrameProfile<T> {
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os="android", target_os="windows")))]
     fn drop(&mut self) {
         gl::delete_queries(&self.queries);
     }
 
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os="android", target_os="windows"))]
     fn drop(&mut self) {
     }
 }
@@ -638,13 +638,13 @@ impl<T> GpuProfiler<T> {
         self.next_frame = (self.next_frame + 1) % MAX_PROFILE_FRAMES;
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os="android", target_os="windows")))]
     pub fn add_marker(&mut self, tag: T) -> GpuMarker
     where T: NamedTag {
         self.frames[self.next_frame].add_marker(tag)
     }
 
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os="android", target_os="windows"))]
     pub fn add_marker(&mut self, tag: T) {
         self.frames[self.next_frame].add_marker(tag)
     }
@@ -653,7 +653,7 @@ impl<T> GpuProfiler<T> {
 #[must_use]
 pub struct GpuMarker(());
 
-#[cfg(any(target_arch="arm", target_arch="aarch64"))]
+#[cfg(any(target_os="android", target_os="windows"))]
 impl GpuMarker {
     pub fn new(_: &str) -> GpuMarker {
         GpuMarker(())
@@ -663,7 +663,7 @@ impl GpuMarker {
 }
 
 
-#[cfg(not(any(target_arch="arm", target_arch="aarch64")))]
+#[cfg(not(any(target_os="android", target_os="windows")))]
 impl GpuMarker {
     pub fn new(message: &str) -> GpuMarker {
        gl::push_group_marker_ext(message);
@@ -675,7 +675,7 @@ impl GpuMarker {
     }
 }
 
-#[cfg(not(any(target_arch="arm", target_arch="aarch64")))]
+#[cfg(not(any(target_os="android", target_os="windows")))]
 impl Drop for GpuMarker {
     fn drop(&mut self) {
         gl::pop_group_marker_ext();
@@ -1833,11 +1833,11 @@ impl Device {
         gl::delete_buffers(&[buffer.0]);
     }
 
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os="android", target_os="windows"))]
     pub fn set_multisample(&self, enable: bool) {
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os="android", target_os="windows")))]
     pub fn set_multisample(&self, enable: bool) {
         if self.capabilities.supports_multisampling {
             if enable {
@@ -1945,7 +1945,7 @@ fn gl_texture_formats_for_image_format(format: ImageFormat) -> (gl::GLint, gl::G
         },
         ImageFormat::RGB8 => (gl::RGB as gl::GLint, gl::RGB),
         ImageFormat::RGBA8 => {
-            if cfg!(any(target_arch="arm", target_arch="aarch64")) {
+            if cfg!(any(target_os="android", target_os="windows")) {
                 (GL_FORMAT_BGRA as gl::GLint, GL_FORMAT_BGRA)
             } else {
                 (gl::RGBA as gl::GLint, GL_FORMAT_BGRA)

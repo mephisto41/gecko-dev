@@ -72,7 +72,7 @@ pub unsafe extern fn wr_renderer_readback(width: u32, height: u32,
     gl::read_pixels_into_buffer(0, 0,
                                 width as gl::GLsizei,
                                 height as gl::GLsizei,
-                                gl::BGRA,
+                                gl::BGRA_EXT,
                                 gl::UNSIGNED_BYTE,
                                 slice);
 }
@@ -996,7 +996,7 @@ pub extern fn wr_readback_into_buffer(width: u32, height: u32,
         gl::read_pixels_into_buffer(0, 0,
                                     width as gl::GLsizei,
                                     height as gl::GLsizei,
-                                    gl::BGRA,
+                                    gl::BGRA_EXT,
                                     gl::UNSIGNED_BYTE,
                                     slice);
     }

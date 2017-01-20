@@ -1595,7 +1595,8 @@ CompositorBridgeParent::AllocPWebRenderBridgeParent(const wr::PipelineId& aPipel
     api->SetRootPipeline(aPipelineId);
     mWrBridge = new WebRenderBridgeParent(this, aPipelineId, mWidget, Move(api), Move(holder));
   } else {
-    RefPtr<gl::GLContext> glc(gl::GLContextProvider::CreateForCompositorWidget(mWidget, true));
+    RefPtr<gl::GLContext> glc(gl::GLContextProviderEGL::CreateForCompositorWidget(mWidget, true));
+    MOZ_RELEASE_ASSERT(glc && glc->IsANGLE());
     mCompositor = new WebRenderCompositorOGL(this, glc.get());
     mWrBridge = new WebRenderBridgeParent(this, aPipelineId,
           mWidget, glc.get(), nullptr, mCompositor.get());
