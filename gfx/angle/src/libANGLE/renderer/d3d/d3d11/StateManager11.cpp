@@ -1117,4 +1117,37 @@ const std::vector<TranslatedAttribute> &StateManager11::getCurrentValueAttribs()
     return mCurrentValueAttribs;
 }
 
+gl::Error StateManager11::acquireKeyedMutexSync(IDXGIKeyedMutex* keyedMutex)
+{
+    if (!keyedMutex)
+        return gl::NoError();
+
+    HRESULT hr = keyedMutex->AcquireSync(0, 10000);
+
+    if (FAILED(hr)) {
+        return gl::Error(GL_OUT_OF_MEMORY, "Failed to acquire sync for keyed mutex, result: 0x%X.",
+                         hr);
+    }
+
+    mAcquiredKeyedMutexes.push_back(keyedMutex);
+
+    return gl::NoError();
+}
+
+gl::Error StateManager11::releaseAllKeyedMutexSync()
+{
+    for (IDXGIKeyedMutex *keyedMutex : mAcquiredKeyedMutexes)
+    {
+        HRESULT hr = keyedMutex->ReleaseSync(0);
+        if (FAILED(hr)) {
+            return gl::Error(GL_OUT_OF_MEMORY, "Failed to release sync for keyed mutex, result: 0x%X.",
+                             hr);
+        }
+    }
+
+    mAcquiredKeyedMutexes.clear();
+
+    return gl::NoError();
+}
+
 }  // namespace rx

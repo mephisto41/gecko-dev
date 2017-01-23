@@ -1423,7 +1423,9 @@ gl::Error Renderer11::setTexture(gl::SamplerType type, int index, gl::Texture *t
         ASSERT(texStorage);
 
         TextureStorage11 *storage11 = GetAs<TextureStorage11>(texStorage);
+        IDXGIKeyedMutex *keyedMutex = storage11->getKeyedMutex();
 
+        ANGLE_TRY(mStateManager.acquireKeyedMutexSync(keyedMutex));
         ANGLE_TRY(storage11->getSRV(texture->getTextureState(), &textureSRV));
 
         // If we get NULL back from getSRV here, something went wrong in the texture class and we're
@@ -4474,6 +4476,25 @@ ContextImpl *Renderer11::createContext(const gl::ContextState &state)
     return new Context11(state, this);
 }
 
+class ScopedReleaseKeyedMutexSync final
+{
+public:
+  explicit ScopedReleaseKeyedMutexSync(StateManager11 *stateManager)
+    : mStateManager(stateManager)
+  {
+  }
+
+  ~ScopedReleaseKeyedMutexSync()
+  {
+    if (mStateManager) {
+      mStateManager->releaseAllKeyedMutexSync();
+    }
+  }
+
+private:
+  StateManager11 *mStateManager;
+};
+
 gl::Error Renderer11::genericDrawElements(Context11 *context,
                                           GLenum mode,
                                           GLsizei count,
@@ -4514,6 +4535,7 @@ gl::Error Renderer11::genericDrawElements(Context11 *context,
     ANGLE_TRY(applyVertexBuffer(glState, mode, static_cast<GLsizei>(indexInfo.indexRange.start),
                                 static_cast<GLsizei>(vertexCount), instances, &indexInfo));
     ANGLE_TRY(applyTextures(context, data));
+    ScopedReleaseKeyedMutexSync scopedReleaseKeyedMutexSync(&mStateManager);
     ANGLE_TRY(applyShaders(data, mode));
     ANGLE_TRY(programD3D->applyUniformBuffers(data));
 
@@ -4550,6 +4572,7 @@ gl::Error Renderer11::genericDrawArrays(Context11 *context,
     ANGLE_TRY(applyTransformFeedbackBuffers(data));
     ANGLE_TRY(applyVertexBuffer(glState, mode, first, count, instances, nullptr));
     ANGLE_TRY(applyTextures(context, data));
+    ScopedReleaseKeyedMutexSync scopedReleaseKeyedMutexSync(&mStateManager);
     ANGLE_TRY(applyShaders(data, mode));
     ANGLE_TRY(programD3D->applyUniformBuffers(data));
 

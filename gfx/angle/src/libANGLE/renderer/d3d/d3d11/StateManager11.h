@@ -97,6 +97,9 @@ class StateManager11 final : angle::NonCopyable
 
     const std::vector<TranslatedAttribute> &getCurrentValueAttribs() const;
 
+    gl::Error acquireKeyedMutexSync(IDXGIKeyedMutex* keyedMutex);
+    gl::Error releaseAllKeyedMutexSync();
+
   private:
     void setViewportBounds(const int width, const int height);
     void unsetConflictingSRVs(gl::SamplerType shaderType,
@@ -196,6 +199,7 @@ class StateManager11 final : angle::NonCopyable
     // Current translations of "Current-Value" data - owned by Context, not VertexArray.
     gl::AttributesMask mDirtyCurrentValueAttribs;
     std::vector<TranslatedAttribute> mCurrentValueAttribs;
+    std::vector<IDXGIKeyedMutex *> mAcquiredKeyedMutexes;
 };
 
 }  // namespace rx

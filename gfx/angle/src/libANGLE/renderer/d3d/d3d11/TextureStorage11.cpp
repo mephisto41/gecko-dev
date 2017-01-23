@@ -719,6 +719,7 @@ TextureStorage11_2D::TextureStorage11_2D(Renderer11 *renderer, SwapChain11 *swap
     mTextureWidth  = texDesc.Width;
     mTextureHeight = texDesc.Height;
     mTextureDepth  = 1;
+    mKeyedMutex = d3d11::DynamicCastComObject<IDXGIKeyedMutex>(mTexture);
     mHasKeyedMutex = (texDesc.MiscFlags & D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX) != 0;
 }
 

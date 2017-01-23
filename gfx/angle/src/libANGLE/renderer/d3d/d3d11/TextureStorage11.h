@@ -47,6 +47,7 @@ class TextureStorage11 : public TextureStorage
     virtual gl::Error getResource(ID3D11Resource **outResource) = 0;
     virtual gl::Error getSRV(const gl::TextureState &textureState,
                              ID3D11ShaderResourceView **outSRV);
+    virtual IDXGIKeyedMutex* getKeyedMutex() { return nullptr; }
     virtual gl::Error getRenderTarget(const gl::ImageIndex &index, RenderTargetD3D **outRT) = 0;
 
     virtual gl::Error generateMipmap(const gl::ImageIndex &sourceIndex, const gl::ImageIndex &destIndex);
@@ -151,6 +152,7 @@ class TextureStorage11_2D : public TextureStorage11
     ~TextureStorage11_2D() override;
 
     gl::Error getResource(ID3D11Resource **outResource) override;
+    IDXGIKeyedMutex* getKeyedMutex() override { return mKeyedMutex; }
     gl::Error getMippedResource(ID3D11Resource **outResource) override;
     gl::Error getRenderTarget(const gl::ImageIndex &index, RenderTargetD3D **outRT) override;
 
@@ -180,6 +182,7 @@ class TextureStorage11_2D : public TextureStorage11
 
     ID3D11Texture2D *mTexture;
     RenderTarget11 *mRenderTarget[gl::IMPLEMENTATION_MAX_TEXTURE_LEVELS];
+    IDXGIKeyedMutex *mKeyedMutex;
     bool mHasKeyedMutex;
 
     // These are members related to the zero max-LOD workaround.
