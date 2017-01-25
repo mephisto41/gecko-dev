@@ -14,6 +14,7 @@
 #include "mozilla/gfx/DeviceManagerDx.h"
 #include "mozilla/gfx/Logging.h"
 #include "mozilla/layers/CompositorBridgeChild.h"
+#include "mozilla/layers/WebRenderCompositorOGL.h"
 
 namespace mozilla {
 
@@ -654,6 +655,25 @@ CreateTextureHostD3D11(const SurfaceDescriptor& aDesc,
   return result.forget();
 }
 
+already_AddRefed<TextureHost>
+CreateTextureHostANGLE(const SurfaceDescriptor& aDesc,
+  ISurfaceAllocator* aDeallocator,
+  TextureFlags aFlags)
+{
+  RefPtr<TextureHost> result;
+  switch (aDesc.type()) {
+    case SurfaceDescriptor::TSurfaceDescriptorD3D10: {
+      result = new DXGITextureHostANGLE(aFlags,
+        aDesc.get_SurfaceDescriptorD3D10());
+      break;
+    }
+    default: {
+      NS_WARNING("Unsupported SurfaceDescriptor type");
+    }
+  }
+  return result.forget();
+}
+
 
 already_AddRefed<DrawTarget>
 D3D11TextureData::BorrowDrawTarget()
@@ -824,6 +844,142 @@ DXGITextureHostD3D11::BindTextureSource(CompositableTextureSourceRef& aTexture)
   MOZ_ASSERT(mTextureSource);
   aTexture = mTextureSource;
   return !!aTexture;
+}
+
+DXGITextureHostANGLE::DXGITextureHostANGLE(TextureFlags aFlags,
+  const SurfaceDescriptorD3D10& aDescriptor)
+  : TextureHost(aFlags)
+  , mSize(aDescriptor.size())
+  , mHandle(aDescriptor.handle())
+  , mFormat(aDescriptor.format())
+  , mIsLocked(false)
+{
+}
+
+bool
+DXGITextureHostANGLE::OpenSharedHandle()
+{
+  if (!GetDevice()) {
+    return false;
+  }
+
+  HRESULT hr = GetDevice()->OpenSharedResource((HANDLE)mHandle,
+    __uuidof(ID3D11Texture2D),
+    (void**)(ID3D11Texture2D**)getter_AddRefs(mTexture));
+  if (FAILED(hr)) {
+    NS_WARNING("Failed to open shared texture");
+    return false;
+  }
+
+  D3D11_TEXTURE2D_DESC desc;
+  mTexture->GetDesc(&desc);
+  mSize = IntSize(desc.Width, desc.Height);
+  return true;
+}
+
+RefPtr<ID3D11Device>
+DXGITextureHostANGLE::GetDevice()
+{
+  if (mFlags & TextureFlags::INVALID_COMPOSITOR) {
+    return nullptr;
+  }
+
+  return DeviceManagerDx::Get()->GetCompositorDevice();
+}
+
+static WebRenderCompositorOGL* AssertWRANGLECompositor(Compositor* aCompositor)
+{
+  WebRenderCompositorOGL* compositor = aCompositor ? aCompositor->AsWebRenderCompositorOGL()
+    : nullptr;
+  if (!compositor || !compositor->gl()->IsANGLE()) {
+    gfxCriticalNote << "[WRANGLE] Attempt to set an incompatible compositor";
+  }
+  return compositor;
+}
+
+void
+DXGITextureHostANGLE::SetCompositor(Compositor* aCompositor)
+{
+  WebRenderCompositorOGL* WrCompositor = AssertWRANGLECompositor(aCompositor);
+  if (!WrCompositor) {
+    mCompositor = nullptr;
+    return;
+  }
+  mCompositor = WrCompositor;
+}
+
+Compositor*
+DXGITextureHostANGLE::GetCompositor()
+{
+  return mCompositor;
+}
+
+bool
+DXGITextureHostANGLE::Lock()
+{
+  if (!mCompositor) {
+    // Make an early return here if we call SetCompositor() with an incompatible
+    // compositor. This check tries to prevent the problem where we use that
+    // incompatible compositor to compose this texture.
+    return false;
+  }
+
+  return LockInternal();
+}
+
+bool
+DXGITextureHostANGLE::LockWithoutCompositor()
+{
+  // Unlike the normal Lock() function, this function may be called when
+  // mCompositor is nullptr such as during WebVR frame submission. So, there is
+  // no 'mCompositor' checking here.
+  return LockInternal();
+}
+
+void
+DXGITextureHostANGLE::Unlock()
+{
+  UnlockInternal();
+}
+
+void
+DXGITextureHostANGLE::UnlockWithoutCompositor()
+{
+  UnlockInternal();
+}
+
+bool
+DXGITextureHostANGLE::LockInternal()
+{
+  if (!GetDevice()) {
+    NS_WARNING("trying to lock a TextureHost without a D3D device");
+    return false;
+  }
+
+  if (!mTexture) {
+    if (!OpenSharedHandle()) {
+      DeviceManagerDx::Get()->ForceDeviceReset(ForcedDeviceResetReason::OPENSHAREDHANDLE);
+      return false;
+    }
+  }
+
+  mIsLocked = LockD3DTexture(mTexture.get());
+
+  return mIsLocked;
+}
+
+void
+DXGITextureHostANGLE::UnlockInternal()
+{
+  UnlockD3DTexture(mTexture.get());
+}
+
+bool
+DXGITextureHostANGLE::BindTextureSource(CompositableTextureSourceRef& aTexture)
+{
+  MOZ_ASSERT(mIsLocked);
+  aTexture = nullptr;
+  return false;
 }
 
 DXGIYCbCrTextureHostD3D11::DXGIYCbCrTextureHostD3D11(TextureFlags aFlags,

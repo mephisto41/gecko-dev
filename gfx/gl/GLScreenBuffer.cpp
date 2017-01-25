@@ -116,6 +116,17 @@ GLScreenBuffer::CreateFactory(GLContext* gl,
 #endif
               break;
             }
+            case mozilla::layers::LayersBackend::LAYERS_WR: {
+#ifdef XP_WIN
+                gfx::DeviceManagerDx* dm = gfx::DeviceManagerDx::Get();
+                if (gl->IsANGLE() &&
+                    (gl->IsWARP() == dm->IsWARP()) &&
+                    dm->TextureSharingWorks())
+                {
+                    factory = SurfaceFactory_ANGLEShareHandle::Create(gl, caps, ipcChannel, flags);
+                }
+#endif
+            }
             default:
               break;
         }

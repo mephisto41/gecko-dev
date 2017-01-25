@@ -343,6 +343,51 @@ protected:
   bool mIsLocked;
 };
 
+class DXGITextureHostANGLE : public TextureHost
+{
+public:
+  DXGITextureHostANGLE(TextureFlags aFlags,
+    const SurfaceDescriptorD3D10& aDescriptor);
+
+  virtual bool BindTextureSource(CompositableTextureSourceRef& aTexture) override;
+
+  virtual void DeallocateDeviceData() override {}
+
+  virtual void SetCompositor(Compositor* aCompositor) override;
+
+  virtual Compositor* GetCompositor() override;
+
+  virtual gfx::SurfaceFormat GetFormat() const override { return mFormat; }
+
+  virtual bool Lock() override;
+  virtual void Unlock() override;
+
+  virtual bool LockWithoutCompositor() override;
+  virtual void UnlockWithoutCompositor() override;
+
+  virtual gfx::IntSize GetSize() const override { return mSize; }
+
+  virtual already_AddRefed<gfx::DataSourceSurface> GetAsSurface() override
+  {
+    return nullptr;
+  }
+
+protected:
+  bool LockInternal();
+  void UnlockInternal();
+
+  RefPtr<ID3D11Device> GetDevice();
+
+  bool OpenSharedHandle();
+
+  RefPtr<ID3D11Texture2D> mTexture;
+  RefPtr<WebRenderCompositorOGL> mCompositor;
+  gfx::IntSize mSize;
+  WindowsHandle mHandle;
+  gfx::SurfaceFormat mFormat;
+  bool mIsLocked;
+};
+
 class DXGIYCbCrTextureHostD3D11 : public TextureHost
 {
 public:
