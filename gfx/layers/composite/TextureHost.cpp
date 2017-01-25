@@ -178,6 +178,10 @@ already_AddRefed<TextureHost> CreateTextureHostD3D11(const SurfaceDescriptor& aD
                                                  ISurfaceAllocator* aDeallocator,
                                                  TextureFlags aFlags);
 
+already_AddRefed<TextureHost> CreateTextureHostANGLE(const SurfaceDescriptor& aDesc,
+                                                     ISurfaceAllocator* aDeallocator,
+                                                     TextureFlags aFlags);
+
 // implemented in TextureD3D9.cpp
 already_AddRefed<TextureHost> CreateTextureHostD3D9(const SurfaceDescriptor& aDesc,
                                                 ISurfaceAllocator* aDeallocator,
@@ -224,6 +228,8 @@ TextureHost::Create(const SurfaceDescriptor& aDesc,
     case SurfaceDescriptor::TSurfaceDescriptorDXGIYCbCr:
       if (aBackend == LayersBackend::LAYERS_D3D9) {
         return CreateTextureHostD3D9(aDesc, aDeallocator, aFlags);
+      } else if (aBackend == LayersBackend::LAYERS_WR) {
+        return CreateTextureHostANGLE(aDesc, aDeallocator, aFlags);
       } else {
         return CreateTextureHostD3D11(aDesc, aDeallocator, aFlags);
       }
