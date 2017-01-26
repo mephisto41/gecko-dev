@@ -27,8 +27,6 @@ public:
     MOZ_COUNT_CTOR(WebRenderCanvasLayer);
   }
 
-  virtual void Initialize(const Data& aData) override;
-
   virtual CompositableForwarder* GetForwarder() override
   {
     return Manager()->WrBridge();
