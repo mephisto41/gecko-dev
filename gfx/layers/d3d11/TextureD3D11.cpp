@@ -15,6 +15,9 @@
 #include "mozilla/gfx/Logging.h"
 #include "mozilla/layers/CompositorBridgeChild.h"
 #include "mozilla/layers/WebRenderCompositorOGL.h"
+#include "GLLibraryEGL.h"
+#include "GLContextEGL.h"
+#include "GLReadTexImageHelper.h"
 
 namespace mozilla {
 
@@ -980,6 +983,152 @@ DXGITextureHostANGLE::BindTextureSource(CompositableTextureSourceRef& aTexture)
   MOZ_ASSERT(mIsLocked);
   aTexture = nullptr;
   return false;
+}
+
+already_AddRefed<gfx::DataSourceSurface>
+DXGITextureHostANGLE::GetAsSurface()
+{
+  if (!mCompositor)
+    return nullptr;
+
+  gl::GLContext* gl = mCompositor->AsWebRenderCompositorOGL()->gl();
+
+  static const GLfloat squareVertices[] = {
+    1.0f, 1.0f,
+    -1.0f, 1.0f,
+    -1.0f, -1.0f,
+    1.0f, 1.0f,
+    -1.0f, -1.0f,
+    1.0f, -1.0f,
+  };
+
+  static const GLfloat textureVertices[] = {
+  1.0f, 1.0f,
+  0.0f, 1.0f,
+  0.0f, 0.0f,
+  1.0f, 1.0f,
+  0.0f,  0.0f,
+  1.0f,  0.0f,
+  };
+
+  gl->MakeCurrent();
+  GLuint vertexbuffer;
+  gl->fGenBuffers(1, &vertexbuffer);
+  gl->fBindBuffer(LOCAL_GL_ARRAY_BUFFER, vertexbuffer);
+  gl->fBufferData(LOCAL_GL_ARRAY_BUFFER, sizeof(squareVertices), squareVertices, LOCAL_GL_STATIC_DRAW);
+  gl->fEnableVertexAttribArray(0);
+  gl->fVertexAttribPointer(0, 2, LOCAL_GL_FLOAT, 0, 0, 0);
+
+  GLuint texbuffer;
+  gl->fGenBuffers(1, &texbuffer);
+  gl->fBindBuffer(LOCAL_GL_ARRAY_BUFFER, texbuffer);
+  gl->fBufferData(LOCAL_GL_ARRAY_BUFFER, sizeof(textureVertices), textureVertices, LOCAL_GL_STATIC_DRAW);
+  gl->fEnableVertexAttribArray(1);
+  gl->fVertexAttribPointer(1, 2, LOCAL_GL_FLOAT, 0, 0, 0);
+
+
+
+  // Creating shader
+  GLuint vs = gl->fCreateShader(LOCAL_GL_VERTEX_SHADER);
+  GLuint ps = gl->fCreateShader(LOCAL_GL_FRAGMENT_SHADER);
+
+  const GLchar* vs_str =
+    "attribute vec4 vPosition; \
+     attribute vec2 texCoord0; \
+     varying vec2 texCoord; \
+     void main() { \
+       gl_Position = vPosition; \
+       texCoord = texCoord0; \
+     }";
+  const GLchar* ps_str =
+    "precision mediump float; \
+     uniform sampler2D tex; \
+     varying vec2 texCoord; \
+     void main() \
+     { \
+       gl_FragColor = texture2D(tex, texCoord); \
+     }";
+
+  gl->fShaderSource(vs, 1, &vs_str, NULL);
+  gl->fCompileShader(vs);
+
+  gl->fShaderSource(ps, 1, &ps_str, NULL);
+  gl->fCompileShader(ps);
+
+  GLuint program = gl->fCreateProgram();
+  gl->fAttachShader(program, vs);
+  gl->fAttachShader(program, ps);
+  gl->fLinkProgram(program);
+
+  gl::GLLibraryEGL* egl = &gl::sEGLLibrary;
+  EGLConfig config = gl::GLContextEGL::Cast(gl)->mConfig;
+  EGLint pbuffer_attributes[] =
+  {
+  LOCAL_EGL_WIDTH, mSize.width,
+    LOCAL_EGL_HEIGHT, mSize.height,
+    LOCAL_EGL_TEXTURE_TARGET, LOCAL_EGL_TEXTURE_2D,
+    LOCAL_EGL_TEXTURE_FORMAT, LOCAL_EGL_TEXTURE_RGBA,
+    LOCAL_EGL_MIPMAP_TEXTURE, LOCAL_EGL_TRUE,
+    LOCAL_EGL_NONE
+  };
+
+  EGLSurface surface =
+    egl->fCreatePbufferFromClientBuffer(egl->Display(),
+      LOCAL_EGL_D3D_TEXTURE_2D_SHARE_HANDLE_ANGLE,
+      reinterpret_cast<EGLClientBuffer>(mHandle),
+      config,
+      pbuffer_attributes);
+
+  GLuint tex;
+  gl->fGenTextures(1, &tex);
+  gl->fBindTexture(LOCAL_GL_TEXTURE_2D, tex);
+
+  gl->fTexParameterf(LOCAL_GL_TEXTURE_2D, LOCAL_GL_TEXTURE_MAG_FILTER, LOCAL_GL_NEAREST);
+  gl->fTexParameterf(LOCAL_GL_TEXTURE_2D, LOCAL_GL_TEXTURE_MIN_FILTER, LOCAL_GL_NEAREST);
+  gl->fTexParameterf(LOCAL_GL_TEXTURE_2D, LOCAL_GL_TEXTURE_WRAP_S, LOCAL_GL_CLAMP_TO_EDGE);
+  gl->fTexParameterf(LOCAL_GL_TEXTURE_2D, LOCAL_GL_TEXTURE_WRAP_T, LOCAL_GL_CLAMP_TO_EDGE);
+
+  // Bind pbuffer and render it.
+  egl->fBindTexImage(egl->Display(), surface, LOCAL_EGL_BACK_BUFFER);
+
+
+  gl->fUseProgram(program);
+  GLuint sampler = gl->fGetUniformLocation(program, "tex");
+  gl->fUniform1i(sampler, 0);
+  gl->fActiveTexture(LOCAL_GL_TEXTURE0);
+  gl->fBindTexture(LOCAL_GL_TEXTURE_2D, tex);
+  //gl->fDepthFunc(LOCAL_GL_ALWAYS);
+
+  gl->fClearColor(0.0, 0.0, 1.0, 1.0);
+  gl->fClear(LOCAL_GL_COLOR_BUFFER_BIT | LOCAL_GL_DEPTH_BUFFER_BIT);
+  gl->fDisable(LOCAL_GL_DEPTH_TEST);
+  gl->fDisable(LOCAL_GL_SCISSOR_TEST);
+  gl->fDisable(LOCAL_GL_STENCIL_TEST);
+  gl->fDrawArrays(LOCAL_GL_TRIANGLES, 0, 6);
+  gl->fEnable(LOCAL_GL_DEPTH_TEST);
+  gl->fEnable(LOCAL_GL_SCISSOR_TEST);
+  gl->fEnable(LOCAL_GL_STENCIL_TEST);
+
+  egl->fReleaseTexImage(egl->Display(), surface, LOCAL_EGL_BACK_BUFFER);
+
+  if (!mCompositor->GetWidget())
+    return nullptr;
+
+  LayoutDeviceIntSize size = mCompositor->GetWidget()->GetClientSize();
+  IntSize size2(size.width, size.height);
+  RefPtr<DataSourceSurface> surf;
+  surf = Factory::CreateDataSourceSurfaceWithStride(size2,
+    SurfaceFormat::B8G8R8A8,
+    size2.width * 4);
+
+  //gl->fClearColor(0.0, 1.0, 0.0, 1.0);
+  //gl->fClear(LOCAL_GL_COLOR_BUFFER_BIT);
+  gl::ReadPixelsIntoDataSurface(gl, surf);
+  char buffer[256];
+  static int i = 0;
+  sprintf(buffer, "png/%x%d.png", this, ++i);
+  gfxUtils::WriteAsPNG(surf, buffer);
+  return nullptr;
 }
 
 DXGIYCbCrTextureHostD3D11::DXGIYCbCrTextureHostD3D11(TextureFlags aFlags,

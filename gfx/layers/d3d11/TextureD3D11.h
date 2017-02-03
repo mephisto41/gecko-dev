@@ -367,10 +367,7 @@ public:
 
   virtual gfx::IntSize GetSize() const override { return mSize; }
 
-  virtual already_AddRefed<gfx::DataSourceSurface> GetAsSurface() override
-  {
-    return nullptr;
-  }
+  virtual already_AddRefed<gfx::DataSourceSurface> GetAsSurface() override;
 
 protected:
   bool LockInternal();

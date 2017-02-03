@@ -22,7 +22,7 @@ class WebRenderCompositorOGL final : public Compositor
   typedef mozilla::gl::GLContext GLContext;
 
 public:
-  explicit WebRenderCompositorOGL(CompositorBridgeParent* aCompositorBridge, GLContext* aGLContext);
+  explicit WebRenderCompositorOGL(CompositorBridgeParent* aCompositorBridge, widget::CompositorWidget* aWidget, GLContext* aGLContext);
 
 protected:
   virtual ~WebRenderCompositorOGL();

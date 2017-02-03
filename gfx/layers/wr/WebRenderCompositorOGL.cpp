@@ -20,8 +20,9 @@ using namespace gl;
 namespace layers {
 
 WebRenderCompositorOGL::WebRenderCompositorOGL(CompositorBridgeParent* aCompositorBridge,
+                                               widget::CompositorWidget* aWidget,
                                                GLContext* aGLContext)
-  : Compositor(nullptr, nullptr)
+  : Compositor(aWidget, nullptr)
   , mCompositorBridge(aCompositorBridge)
   , mGLContext(aGLContext)
   , mDestroyed(false)
