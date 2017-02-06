@@ -4661,6 +4661,7 @@ pref("layers.componentalpha.enabled", true);
 pref("layers.draw-mask-debug", false);
 
 pref("layers.advanced.border-layers", false);
+pref("layers.advanced.bullet-layers", true);
 
 pref("gfx.content.always-paint", false);
 
