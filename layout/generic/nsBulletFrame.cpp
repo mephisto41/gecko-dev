@@ -12,6 +12,8 @@
 #include "mozilla/gfx/2D.h"
 #include "mozilla/gfx/PathHelpers.h"
 #include "mozilla/layers/LayersMessages.h"
+#include "mozilla/layers/WebRenderDisplayItemLayer.h"
+#include "mozilla/layers/WebRenderMessages.h"
 #include "mozilla/MathAlgorithms.h"
 #include "mozilla/Move.h"
 #include "nsCOMPtr.h"
@@ -228,6 +230,11 @@ public:
              const ContainerLayerParameters& aContainerParameters,
              nsDisplayItem* aItem);
 
+  void
+  CreateWebRenderCommands(nsDisplayItem* aItem,
+                          nsTArray<layers::WebRenderCommand>& aCommands,
+                          layers::WebRenderLayer* aLayer);
+
   DrawResult
   Paint(nsRenderingContext& aRenderingContext, nsPoint aPt,
         const nsRect& aDirtyRect, uint32_t aFlags,
@@ -265,6 +272,9 @@ public:
   bool
   BuildGlyphForText(nsDisplayItem* aItem, bool disableSubpixelAA);
 
+  bool
+  IsImageContainerAvailable(layers::LayerManager* aManager, uint32_t aFlags);
+
 private:
   already_AddRefed<layers::Layer>
   BuildLayerForImage(layers::Layer* aOldLayer,
@@ -283,6 +293,21 @@ private:
                     nsDisplayListBuilder* aBuilder,
                     layers::LayerManager* aManager,
                     nsDisplayItem* aItem);
+
+  void
+  CreateWebRenderCommandsForImage(nsDisplayItem* aItem,
+                                  nsTArray<layers::WebRenderCommand>& aCommands,
+                                  layers::WebRenderLayer* aLayer);
+
+  void
+  CreateWebRenderCommandsForPath(nsDisplayItem* aItem,
+                                 nsTArray<layers::WebRenderCommand>& aCommands,
+                                 layers::WebRenderLayer* aLayer);
+
+  void
+  CreateWebRenderCommandsForText(nsDisplayItem* aItem,
+                                 nsTArray<layers::WebRenderCommand>& aCommands,
+                                 layers::WebRenderLayer* aLayer);
 
 private:
   // mImage and mDest are the properties for list-style-image.
@@ -335,6 +360,21 @@ BulletRenderer::BuildLayer(nsDisplayListBuilder* aBuilder,
   }
 
   return layer.forget();
+}
+
+void
+BulletRenderer::CreateWebRenderCommands(nsDisplayItem* aItem,
+                                        nsTArray<layers::WebRenderCommand>& aCommands,
+                                        layers::WebRenderLayer* aLayer)
+{
+  if (IsImageType()) {
+    CreateWebRenderCommandsForImage(aItem, aCommands, aLayer);
+  } else if (IsPathType()) {
+    CreateWebRenderCommandsForPath(aItem, aCommands, aLayer);
+  } else {
+    MOZ_ASSERT(IsTextType());
+    CreateWebRenderCommandsForText(aItem, aCommands, aLayer);
+  }
 }
 
 DrawResult
@@ -410,6 +450,7 @@ BulletRenderer::BuildGlyphForText(nsDisplayItem* aItem, bool disableSubpixelAA)
     if (!presContext->BidiEnabled() && HasRTLChars(mText)) {
       presContext->SetBidiEnabled();
     }
+
     nsLayoutUtils::DrawString(aItem->Frame(), *mFontMetrics, &ctx,
                               mText.get(), mText.Length(), mPoint);
   }
@@ -428,6 +469,14 @@ BulletRenderer::BuildGlyphForText(nsDisplayItem* aItem, bool disableSubpixelAA)
   g->color() = color;
 
   return true;
+}
+
+bool
+BulletRenderer::IsImageContainerAvailable(layers::LayerManager* aManager, uint32_t aFlags)
+{
+  MOZ_ASSERT(IsImageType());
+
+  return mImage->IsImageContainerAvailable(aManager, aFlags);
 }
 
 already_AddRefed<layers::Layer>
@@ -516,6 +565,124 @@ BulletRenderer::BuildLayerForText(layers::Layer* aOldLayer,
   return layer.forget();
 }
 
+void
+BulletRenderer::CreateWebRenderCommandsForImage(nsDisplayItem* aItem,
+                                                nsTArray<layers::WebRenderCommand>& aCommands,
+                                                layers::WebRenderLayer* aLayer)
+{
+  MOZ_ASSERT(IsImageType());
+
+  if (!mImage) {
+     return;
+  }
+
+  layers::WebRenderDisplayItemLayer* layer = static_cast<layers::WebRenderDisplayItemLayer*>(aLayer);
+  nsDisplayListBuilder* builder = layer->GetDisplayListBuilder();
+  uint32_t flags = builder->ShouldSyncDecodeImages() ?
+                   imgIContainer::FLAG_SYNC_DECODE :
+                   imgIContainer::FLAG_NONE;
+
+  RefPtr<layers::ImageContainer> container =
+    mImage->GetImageContainer(aLayer->WrManager(), flags);
+  if (!container) {
+    return;
+  }
+
+  uint64_t externalImageId = layer->SendImageContainer(container);
+
+  const int32_t factor = aItem->Frame()->PresContext()->AppUnitsPerDevPixel();
+  const LayoutDeviceRect destRect =
+    LayoutDeviceRect::FromAppUnits(mDest, factor);
+  aCommands.AppendElement(layers::OpDPPushExternalImageId(
+                            LayerIntRegion(),
+                            wr::ToWrRect(destRect),
+                            wr::ToWrRect(destRect),
+                            Nothing(),
+                            WrTextureFilter::Linear,
+                            externalImageId));
+}
+
+void
+BulletRenderer::CreateWebRenderCommandsForPath(nsDisplayItem* aItem,
+                                               nsTArray<layers::WebRenderCommand>& aCommands,
+                                               layers::WebRenderLayer* aLayer)
+{
+  MOZ_ASSERT(IsPathType());
+  // Not supported yet.
+}
+
+struct FontInfo {
+  uint8_t* mFontData;
+  uint32_t mFontDataLength;
+  uint32_t mIndex;
+  float mGlyphSize;
+};
+
+static void
+DWriteFontFileData(const uint8_t* aData, uint32_t aLength, uint32_t aIndex,
+                   float aGlyphSize, uint32_t aVariationCount,
+                   const ScaledFont::VariationSetting* aVariations, void* aBaton)
+{
+    FontInfo* info = static_cast<FontInfo*>(aBaton);
+
+    uint8_t* fontData = (uint8_t*)malloc(aLength * sizeof(uint8_t));
+    memcpy(fontData, aData, aLength * sizeof(uint8_t));
+
+    info->mFontData = fontData;
+    info->mFontDataLength = aLength;
+    info->mIndex = aIndex;
+    info->mGlyphSize = aGlyphSize;
+}
+
+void
+BulletRenderer::CreateWebRenderCommandsForText(nsDisplayItem* aItem,
+                                               nsTArray<layers::WebRenderCommand>& aCommands,
+                                               layers::WebRenderLayer* aLayer)
+{
+  MOZ_ASSERT(IsTextType());
+  MOZ_ASSERT(mFont);
+  MOZ_ASSERT(!mGlyphs.IsEmpty());
+
+  FontInfo info;
+  mFont->GetFontFileData(&DWriteFontFileData, &info);
+  wr::ByteBuffer fontBuffer(info.mFontDataLength, info.mFontData);
+
+  nsTArray<WrGlyphArray> wr_glyphs;
+  wr_glyphs.SetLength(mGlyphs.Length());
+
+  for (size_t i = 0; i < mGlyphs.Length(); i++) {
+    layers::GlyphArray glyph_array = mGlyphs[i];
+    nsTArray<Glyph>& glyphs = glyph_array.glyphs();
+
+    nsTArray<WrGlyphInstance>& wr_glyph_instances = wr_glyphs[i].glyphs;
+    wr_glyph_instances.SetLength(glyphs.Length());
+    wr_glyphs[i].color = glyph_array.color().value();
+
+    for (size_t j = 0; j < glyphs.Length(); j++) {
+      wr_glyph_instances[j].index = glyphs[j].mIndex;
+      wr_glyph_instances[j].x = glyphs[j].mPosition.x;
+      wr_glyph_instances[j].y = glyphs[j].mPosition.y;
+    }
+  }
+
+  const nsIFrame* rootFrame = aItem->Frame()->PresContext()->PresShell()->GetRootFrame();
+  const nsIFrame* refFrame = aItem->ReferenceFrame();
+  nsPoint offset = rootFrame->GetOffsetToCrossDoc(refFrame);
+
+  auto A2D = aItem->Frame()->PresContext()->AppUnitsPerDevPixel();
+  bool dummy;
+  const LayoutDeviceIntRect destBounds =
+    LayoutDeviceIntRect::FromAppUnitsToOutside(aItem->GetBounds(nullptr, &dummy) - offset, A2D);
+  aCommands.AppendElement(layers::OpDPPushText(
+                            wr::ToWrRect(destBounds),
+                            wr::ToWrRect(destBounds),
+                            wr_glyphs,
+                            info.mIndex,
+                            info.mGlyphSize,
+                            fontBuffer,
+                            info.mFontDataLength));
+}
+
 class nsDisplayBullet final : public nsDisplayItem {
 public:
   nsDisplayBullet(nsDisplayListBuilder* aBuilder, nsBulletFrame* aFrame)
@@ -544,6 +711,9 @@ public:
   virtual already_AddRefed<Layer> BuildLayer(nsDisplayListBuilder* aBuilder,
                                              LayerManager* aManager,
                                              const ContainerLayerParameters& aParameters) override;
+
+  virtual void CreateWebRenderCommands(nsTArray<WebRenderCommand>& aCommands,
+                                       WebRenderLayer* aLayer) override;
 
   virtual void HitTest(nsDisplayListBuilder* aBuilder, const nsRect& aRect,
                        HitTestState* aState,
@@ -610,8 +780,9 @@ nsDisplayBullet::GetLayerState(nsDisplayListBuilder* aBuilder,
     gfxContext::CreateOrNull(gfxPlatform::GetPlatform()->ScreenReferenceDrawTarget());
   nsRenderingContext ctx(screenRefCtx);
 
+  const nsIFrame* rootFrame = mFrame->PresContext()->PresShell()->GetRootFrame();
   Maybe<BulletRenderer> br = static_cast<nsBulletFrame*>(mFrame)->
-    CreateBulletRenderer(ctx, ToReferenceFrame());
+    CreateBulletRenderer(ctx, mFrame->GetOffsetTo(rootFrame));
 
   if (!br) {
     return LAYER_NONE;
@@ -620,6 +791,16 @@ nsDisplayBullet::GetLayerState(nsDisplayListBuilder* aBuilder,
   // Only support image and text type.
   if (!br->IsImageType() && !br->IsTextType()) {
     return LAYER_NONE;
+  }
+
+  if (br->IsImageType()) {
+    uint32_t flags = aBuilder->ShouldSyncDecodeImages()
+                   ? imgIContainer::FLAG_SYNC_DECODE
+                   : imgIContainer::FLAG_NONE;
+
+    if (!br->IsImageContainerAvailable(aManager, flags)) {
+      return LAYER_NONE;
+    }
   }
 
   if (br->IsTextType()) {
@@ -641,7 +822,18 @@ nsDisplayBullet::BuildLayer(nsDisplayListBuilder* aBuilder,
     return nullptr;
   }
 
-  return mBulletRenderer->BuildLayer(aBuilder, aManager, aContainerParameters, this);
+  /* return mBulletRenderer->BuildLayer(aBuilder, aManager, aContainerParameters, this); */
+  return BuildDisplayItemLayer(aBuilder, aManager, aContainerParameters);
+}
+
+void
+nsDisplayBullet::CreateWebRenderCommands(nsTArray<WebRenderCommand>& aCommands,
+                                         WebRenderLayer* aLayer)
+{
+  if (!mBulletRenderer)
+    return;
+
+  mBulletRenderer->CreateWebRenderCommands(this, aCommands, aLayer);
 }
 
 void nsDisplayBullet::Paint(nsDisplayListBuilder* aBuilder,
