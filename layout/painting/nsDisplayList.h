@@ -57,6 +57,7 @@ namespace layers {
 class Layer;
 class ImageLayer;
 class ImageContainer;
+class WebRenderCommand;
 } // namespace layers
 } // namespace mozilla
 
@@ -1585,6 +1586,7 @@ public:
   typedef mozilla::layers::Layer Layer;
   typedef mozilla::layers::LayerManager LayerManager;
   typedef mozilla::LayerState LayerState;
+  typedef mozilla::layers::WebRenderCommand WebRenderCommand;
   typedef class mozilla::gfx::DrawTarget DrawTarget;
 
   // This is never instantiated directly (it has pure virtual methods), so no
@@ -1886,6 +1888,11 @@ public:
    * aCtx must be set up as for nsDisplayList::Paint.
    */
   virtual void Paint(nsDisplayListBuilder* aBuilder, nsRenderingContext* aCtx) {}
+
+  /**
+   * Create the WebRenderCommands required to paint this display item.
+   */
+  virtual void CreateWebRenderCommands(nsTArray<WebRenderCommand>& aCommands) {}
 
 #ifdef MOZ_DUMP_PAINTING
   /**
@@ -2804,6 +2811,8 @@ public:
   virtual already_AddRefed<Layer> BuildLayer(nsDisplayListBuilder* aBuilder,
                                              LayerManager* aManager,
                                              const ContainerLayerParameters& aContainerParameters) override;
+
+  virtual void CreateWebRenderCommands(nsTArray<WebRenderCommand>& aCommands) override;
 
 protected:
   RefPtr<nsCaret> mCaret;

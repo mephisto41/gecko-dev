@@ -82,6 +82,9 @@
 #include "nsPluginFrame.h"
 #include "nsSVGMaskFrame.h"
 
+#include "mozilla/layers/WebRenderBridgeChild.h"
+#include "mozilla/layers/WebRenderMessages.h"
+
 // GetCurrentTime is defined in winbase.h as zero argument macro forwarding to
 // GetTickCount().
 #ifdef GetCurrentTime
@@ -4319,6 +4322,45 @@ nsDisplayCaret::Paint(nsDisplayListBuilder* aBuilder,
   // Note: Because we exist, we know that the caret is visible, so we don't
   // need to check for the caret's visibility.
   mCaret->PaintCaret(*aCtx->GetDrawTarget(), mFrame, ToReferenceFrame());
+}
+
+void
+nsDisplayCaret::CreateWebRenderCommands(nsTArray<WebRenderCommand>& aCommands) {
+  using namespace mozilla::layers;
+  int32_t contentOffset;
+  nsIFrame* frame = mCaret->GetFrame(&contentOffset);
+  if (!frame) {
+    return;
+  }
+  // Not sure how we do this now
+  //NS_ASSERTION(frame == aForFrame, "We're referring different frame");
+
+  int32_t appUnitsPerDevPixel = frame->PresContext()->AppUnitsPerDevPixel();
+
+  nsRect caretRect;
+  nsRect hookRect;
+  mCaret->ComputeCaretRects(frame, contentOffset, &caretRect, &hookRect);
+
+  gfx::Color color = ToDeviceColor(frame->GetCaretColorAt(contentOffset));
+
+  DrawTarget* dt = gfxPlatform::GetPlatform()->ScreenReferenceDrawTarget();
+  MOZ_ASSERT(dt);
+  Rect devCaretRect =
+    NSRectToSnappedRect(caretRect + ToReferenceFrame(), appUnitsPerDevPixel, *dt);
+  Rect devHookRect =
+    NSRectToSnappedRect(hookRect + ToReferenceFrame(), appUnitsPerDevPixel, *dt);
+
+  aCommands.AppendElement(OpDPPushRect(
+                            wr::ToWrRect(devCaretRect),
+                            wr::ToWrRect(devCaretRect),
+                            wr::ToWrColor(color)));
+
+  if (!devHookRect.IsEmpty()) {
+    aCommands.AppendElement(OpDPPushRect(
+                            wr::ToWrRect(devHookRect),
+                            wr::ToWrRect(devHookRect),
+                            wr::ToWrColor(color)));
+  }
 }
 
 LayerState
