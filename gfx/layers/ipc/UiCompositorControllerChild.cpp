@@ -7,6 +7,7 @@
 #include "UiCompositorControllerChild.h"
 #include "UiCompositorControllerParent.h"
 #include "mozilla/dom/ContentChild.h"
+#include "mozilla/gfx/GPUProcessManager.h"
 #include "mozilla/layers/CompositorThread.h"
 #include "mozilla/StaticPtr.h"
 #include "nsThreadUtils.h"
@@ -112,7 +113,7 @@ UiCompositorControllerChild::OpenForGPUProcess(Endpoint<PUiCompositorControllerC
   if (!aEndpoint.Bind(this)) {
     // The GPU Process Manager might be gone if we receive ActorDestroy very
     // late in shutdown.
-    if (GPUProcessManager* gpm = GPUProcessManager::Get()) {
+    if (gfx::GPUProcessManager* gpm = gfx::GPUProcessManager::Get()) {
       gpm->NotifyRemoteActorDestroyed(mProcessToken);
     }
     return;
@@ -151,7 +152,7 @@ void
 UiCompositorControllerChild::ActorDestroy(ActorDestroyReason aWhy)
 {
   if (mProcessToken) {
-    GPUProcessManager::Get()->NotifyRemoteActorDestroyed(mProcessToken);
+    gfx::GPUProcessManager::Get()->NotifyRemoteActorDestroyed(mProcessToken);
     mProcessToken = 0;
     sParent = nullptr;
   }

@@ -22,8 +22,8 @@ WebRenderColorLayer::RenderLayer()
 
   LayerIntRegion visibleRegion = GetVisibleRegion();
   LayerIntRect bounds = visibleRegion.GetBounds();
-  Rect rect = RelativeToVisible(IntRectToRect(bounds.ToUnknownRect()));
-  Rect clip;
+  gfx::Rect rect = RelativeToVisible(IntRectToRect(bounds.ToUnknownRect()));
+  gfx::Rect clip;
   if (GetClipRect().isSome()) {
       clip = RelativeToTransformedVisible(IntRectToRect(GetClipRect().ref().ToUnknownRect()));
   } else {
