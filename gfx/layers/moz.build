@@ -211,6 +211,7 @@ EXPORTS.mozilla.layers += [
     'wr/WebRenderBridgeParent.h',
     'wr/WebRenderCompositableHolder.h',
     'wr/WebRenderCompositorOGL.h',
+    'wr/WebRenderDisplayItemLayer.h',
     'wr/WebRenderImageHost.h',
     'wr/WebRenderLayerManager.h',
     'wr/WebRenderLayersLogging.h',
