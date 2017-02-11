@@ -58,6 +58,7 @@ class Layer;
 class ImageLayer;
 class ImageContainer;
 class WebRenderCommand;
+class WebRenderLayer;
 } // namespace layers
 } // namespace mozilla
 
@@ -1585,6 +1586,7 @@ public:
   typedef mozilla::layers::FrameMetrics::ViewID ViewID;
   typedef mozilla::layers::Layer Layer;
   typedef mozilla::layers::LayerManager LayerManager;
+  typedef mozilla::layers::WebRenderLayer WebRenderLayer;
   typedef mozilla::LayerState LayerState;
   typedef mozilla::layers::WebRenderCommand WebRenderCommand;
   typedef class mozilla::gfx::DrawTarget DrawTarget;
@@ -1891,8 +1893,11 @@ public:
 
   /**
    * Create the WebRenderCommands required to paint this display item.
+   * The layer this item is in is passed in as rects must be relative
+   * to their parent.
    */
-  virtual void CreateWebRenderCommands(nsTArray<WebRenderCommand>& aCommands) {}
+   virtual void CreateWebRenderCommands(nsTArray<WebRenderCommand>& aCommands,
+                                        WebRenderLayer* aLayer) {}
 
 #ifdef MOZ_DUMP_PAINTING
   /**
@@ -1924,6 +1929,14 @@ public:
                                              LayerManager* aManager,
                                              const ContainerLayerParameters& aContainerParameters)
   { return nullptr; }
+
+  /**
+   * Builds a DisplayItemLayer and sets the display item to this.
+   */
+   already_AddRefed<Layer>
+   BuildDisplayItemLayer(nsDisplayListBuilder* aBuilder,
+                         LayerManager* aManager,
+                         const ContainerLayerParameters& aContainerParameters);
 
   /**
    * On entry, aVisibleRegion contains the region (relative to ReferenceFrame())
@@ -2812,7 +2825,8 @@ public:
                                              LayerManager* aManager,
                                              const ContainerLayerParameters& aContainerParameters) override;
 
-  virtual void CreateWebRenderCommands(nsTArray<WebRenderCommand>& aCommands) override;
+  virtual void CreateWebRenderCommands(nsTArray<WebRenderCommand>& aCommands,
+                                       WebRenderLayer* aLayer) override;
 
 protected:
   RefPtr<nsCaret> mCaret;

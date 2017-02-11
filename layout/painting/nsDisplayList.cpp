@@ -82,6 +82,7 @@
 #include "nsPluginFrame.h"
 #include "nsSVGMaskFrame.h"
 
+#include "mozilla/layers/WebRenderLayerManager.h"
 #include "mozilla/layers/WebRenderBridgeChild.h"
 #include "mozilla/layers/WebRenderMessages.h"
 
@@ -2731,6 +2732,27 @@ nsDisplayItem::GetClippedBounds(nsDisplayListBuilder* aBuilder)
   return GetClip().ApplyNonRoundedIntersection(r);
 }
 
+already_AddRefed<Layer>
+nsDisplayItem::BuildDisplayItemLayer(nsDisplayListBuilder* aBuilder,
+                                     LayerManager* aManager,
+                                     const ContainerLayerParameters& aContainerParameters)
+{
+  RefPtr<DisplayItemLayer> layer = static_cast<DisplayItemLayer*>
+    (aManager->GetLayerBuilder()->GetLeafLayerFor(aBuilder, this));
+  if (!layer) {
+    layer = aManager->CreateDisplayItemLayer();
+
+    if (!layer) {
+      return nullptr;
+    }
+  }
+
+  layer->SetDisplayItem(this, aBuilder);
+  layer->SetBaseTransform(gfx::Matrix4x4::Translation(aContainerParameters.mOffset.x,
+                                                      aContainerParameters.mOffset.y, 0));
+  return layer.forget();
+}
+
 nsRect
 nsDisplaySolidColor::GetBounds(nsDisplayListBuilder* aBuilder, bool* aSnap)
 {
@@ -4325,7 +4347,8 @@ nsDisplayCaret::Paint(nsDisplayListBuilder* aBuilder,
 }
 
 void
-nsDisplayCaret::CreateWebRenderCommands(nsTArray<WebRenderCommand>& aCommands) {
+nsDisplayCaret::CreateWebRenderCommands(nsTArray<WebRenderCommand>& aCommands,
+                                        WebRenderLayer* aLayer) {
   using namespace mozilla::layers;
   int32_t contentOffset;
   nsIFrame* frame = mCaret->GetFrame(&contentOffset);
@@ -4333,7 +4356,7 @@ nsDisplayCaret::CreateWebRenderCommands(nsTArray<WebRenderCommand>& aCommands) {
     return;
   }
   // Not sure how we do this now
-  //NS_ASSERTION(frame == aForFrame, "We're referring different frame");
+  NS_ASSERTION(frame == mFrame, "We're referring different frame");
 
   int32_t appUnitsPerDevPixel = frame->PresContext()->AppUnitsPerDevPixel();
 
@@ -4342,23 +4365,27 @@ nsDisplayCaret::CreateWebRenderCommands(nsTArray<WebRenderCommand>& aCommands) {
   mCaret->ComputeCaretRects(frame, contentOffset, &caretRect, &hookRect);
 
   gfx::Color color = ToDeviceColor(frame->GetCaretColorAt(contentOffset));
-
-  DrawTarget* dt = gfxPlatform::GetPlatform()->ScreenReferenceDrawTarget();
-  MOZ_ASSERT(dt);
   Rect devCaretRect =
-    NSRectToSnappedRect(caretRect + ToReferenceFrame(), appUnitsPerDevPixel, *dt);
+    NSRectToRect(caretRect + ToReferenceFrame(), appUnitsPerDevPixel);
   Rect devHookRect =
-    NSRectToSnappedRect(hookRect + ToReferenceFrame(), appUnitsPerDevPixel, *dt);
+    NSRectToRect(hookRect + ToReferenceFrame(), appUnitsPerDevPixel);
 
+  Rect caretTransformedRect = aLayer->RelativeToParent(devCaretRect);
+  Rect hookTransformedRect = aLayer->RelativeToParent(devHookRect);
+
+  IntRect caret = RoundedToInt(caretTransformedRect);
+  IntRect hook = RoundedToInt(hookTransformedRect);
+
+  // Note, WR will pixel snap anything that is layout aligned.
   aCommands.AppendElement(OpDPPushRect(
-                            wr::ToWrRect(devCaretRect),
-                            wr::ToWrRect(devCaretRect),
-                            wr::ToWrColor(color)));
+                          wr::ToWrRect(caret),
+                          wr::ToWrRect(caret),
+                          wr::ToWrColor(color)));
 
   if (!devHookRect.IsEmpty()) {
     aCommands.AppendElement(OpDPPushRect(
-                            wr::ToWrRect(devHookRect),
-                            wr::ToWrRect(devHookRect),
+                            wr::ToWrRect(hook),
+                            wr::ToWrRect(hook),
                             wr::ToWrColor(color)));
   }
 }
@@ -4372,7 +4399,7 @@ nsDisplayCaret::GetLayerState(nsDisplayListBuilder* aBuilder,
     return LAYER_ACTIVE;
   }
 
-  return LAYER_NONE;
+  return LAYER_ACTIVE;
 }
 
 already_AddRefed<Layer>
@@ -4380,20 +4407,7 @@ nsDisplayCaret::BuildLayer(nsDisplayListBuilder* aBuilder,
                            LayerManager* aManager,
                            const ContainerLayerParameters& aContainerParameters)
 {
-  RefPtr<DisplayItemLayer> layer = static_cast<DisplayItemLayer*>
-    (aManager->GetLayerBuilder()->GetLeafLayerFor(aBuilder, this));
-  if (!layer) {
-    layer = aManager->CreateDisplayItemLayer();
-
-    if (!layer) {
-      return nullptr;
-    }
-  }
-
-  layer->SetDisplayItem(this, aBuilder);
-  layer->SetBaseTransform(gfx::Matrix4x4::Translation(aContainerParameters.mOffset.x,
-                                                      aContainerParameters.mOffset.y, 0));
-  return layer.forget();
+  return BuildDisplayItemLayer(aBuilder, aManager, aContainerParameters);
 }
 
 nsDisplayBorder::nsDisplayBorder(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame)
