@@ -4321,6 +4321,39 @@ nsDisplayCaret::Paint(nsDisplayListBuilder* aBuilder,
   mCaret->PaintCaret(*aCtx->GetDrawTarget(), mFrame, ToReferenceFrame());
 }
 
+LayerState
+nsDisplayCaret::GetLayerState(nsDisplayListBuilder* aBuilder,
+                              LayerManager* aManager,
+                              const ContainerLayerParameters& aParameters)
+{
+  if (gfxPrefs::LayersAllowCaretLayers()) {
+    return LAYER_ACTIVE;
+  }
+
+  return LAYER_NONE;
+}
+
+already_AddRefed<Layer>
+nsDisplayCaret::BuildLayer(nsDisplayListBuilder* aBuilder,
+                           LayerManager* aManager,
+                           const ContainerLayerParameters& aContainerParameters)
+{
+  RefPtr<DisplayItemLayer> layer = static_cast<DisplayItemLayer*>
+    (aManager->GetLayerBuilder()->GetLeafLayerFor(aBuilder, this));
+  if (!layer) {
+    layer = aManager->CreateDisplayItemLayer();
+
+    if (!layer) {
+      return nullptr;
+    }
+  }
+
+  layer->SetDisplayItem(this, aBuilder);
+  layer->SetBaseTransform(gfx::Matrix4x4::Translation(aContainerParameters.mOffset.x,
+                                                      aContainerParameters.mOffset.y, 0));
+  return layer.forget();
+}
+
 nsDisplayBorder::nsDisplayBorder(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame)
   : nsDisplayItem(aBuilder, aFrame)
 {
