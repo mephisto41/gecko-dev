@@ -92,8 +92,8 @@ WebRenderImageHost::GetCompositionTime() const
 TextureHost*
 WebRenderImageHost::GetAsTextureHost(IntRect* aPictureRect)
 {
-  MOZ_ASSERT_UNREACHABLE("unexpected to be called");
-  return nullptr;
+  TimedImage* img = ChooseImage();
+  return img ? img->mTextureHost.get() : nullptr;
 }
 
 void WebRenderImageHost::Attach(Layer* aLayer,

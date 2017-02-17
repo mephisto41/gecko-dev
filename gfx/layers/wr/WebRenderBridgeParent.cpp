@@ -19,6 +19,7 @@
 #include "mozilla/layers/TextureHost.h"
 #include "mozilla/layers/WebRenderCompositableHolder.h"
 #include "mozilla/webrender/RenderThread.h"
+#include "mozilla/webrender/RendererOGL.h"
 #include "mozilla/widget/CompositorWidget.h"
 
 bool is_in_compositor_thread()
@@ -300,6 +301,15 @@ WebRenderBridgeParent::ProcessWebrenderCommands(InfallibleTArray<WebRenderComman
         if (!host) {
           break;
         }
+
+        if (host->GetType() == CompositableType::IMAGE) {
+            wr::RendererOGL* renderer = wr::RenderThread::Get()->GetRenderer(mApi->GetId());
+            MutexAutoLock mutex(renderer->mHostMutex);
+            if (renderer->gHost == nullptr) {
+                renderer->gHost = host;
+            }
+        }
+        
         RefPtr<DataSourceSurface> dSurf = host->GetAsSurface();
         if (!dSurf) {
           break;

@@ -451,6 +451,8 @@ public:
    */
    void Updated(const nsIntRegion* aRegion = nullptr);
 
+   virtual void BindTest(gl::GLContext* gl, widget::CompositorWidget* widget) {}
+
   /**
    * Sets this TextureHost's compositor.
    * A TextureHost can change compositor on certain occasions, in particular if

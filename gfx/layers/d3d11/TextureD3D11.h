@@ -374,6 +374,8 @@ public:
     return nullptr;
   }
 
+  virtual void BindTest(gl::GLContext* gl, widget::CompositorWidget* widget) override;
+
 protected:
   bool LockInternal();
   void UnlockInternal();

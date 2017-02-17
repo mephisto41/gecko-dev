@@ -98,7 +98,7 @@ RenderThread::RemoveRenderer(wr::WindowId aWindowId)
 RendererOGL*
 RenderThread::GetRenderer(wr::WindowId aWindowId)
 {
-  MOZ_ASSERT(IsInRenderThread());
+  //MOZ_ASSERT(IsInRenderThread());
 
   auto it = mRenderers.find(aWindowId);
   MOZ_ASSERT(it != mRenderers.end());

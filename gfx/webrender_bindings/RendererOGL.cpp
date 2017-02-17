@@ -9,6 +9,7 @@
 #include "mozilla/gfx/Logging.h"
 #include "mozilla/layers/CompositorBridgeParent.h"
 #include "mozilla/layers/CompositorThread.h"
+#include "mozilla/layers/TextureHost.h"
 #include "mozilla/widget/CompositorWidget.h"
 
 namespace mozilla {
@@ -26,6 +27,7 @@ RendererOGL::RendererOGL(RefPtr<RenderThread>&& aThread,
   , mWrRenderer(aWrRenderer)
   , mBridge(aBridge)
   , mWindowId(aWindowId)
+  , mHostMutex("host mutex")
 {
   MOZ_ASSERT(mThread);
   MOZ_ASSERT(mGL);
@@ -72,7 +74,18 @@ RendererOGL::Render()
   mWidget->DrawWindowUnderlay(&widgetContext, LayoutDeviceIntRect());
 
   auto size = mWidget->GetClientSize();
-  wr_renderer_render(mWrRenderer, size.width, size.height);
+  {
+      MutexAutoLock mutex(mHostMutex);
+      if (gHost) {
+          layers::TextureHost* texturehost = gHost->GetAsTextureHost(nullptr);
+          texturehost->BindTest(mGL, mWidget);
+          gHost = nullptr;
+      }
+      else {
+          wr_renderer_render(mWrRenderer, size.width, size.height);
+      }
+  }
+  
 
   mGL->SwapBuffers();
   mWidget->DrawWindowOverlay(&widgetContext, LayoutDeviceIntRect());

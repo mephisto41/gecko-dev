@@ -10,6 +10,8 @@
 #include "mozilla/webrender/RenderThread.h"
 #include "mozilla/webrender/WebRenderTypes.h"
 #include "mozilla/webrender/webrender_ffi.h"
+#include "CompositableHost.h"
+#include "mozilla/Mutex.h"
 
 namespace mozilla {
 
@@ -65,6 +67,9 @@ public:
   layers::CompositorBridgeParentBase* GetCompositorBridge() { return mBridge; }
 
   WrRenderedEpochs* FlushRenderedEpochs();
+
+  RefPtr<layers::CompositableHost> gHost;
+  Mutex mHostMutex;
 
 protected:
 
