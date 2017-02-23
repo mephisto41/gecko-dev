@@ -4162,14 +4162,20 @@ nsDisplayOutline::CreateWebRenderCommands(wr::DisplayListBuilder& aBuilder,
   nsCSSBorderRenderer* br = mBorderRenderer.ptr();
   WrBorderSide side[4];
   NS_FOR_CSS_SIDES(i) {
-    side[i] = wr::ToWrBorderSide(br->mBorderWidths[i], ToDeviceColor(br->mBorderColors[i]), br->mBorderStyles[i]);
+    side[i] = wr::ToWrBorderSide(ToDeviceColor(br->mBorderColors[i]), br->mBorderStyles[i]);
   }
-  WrBorderRadius borderRadius = wr::ToWrBorderRadius(LayerSize(br->mBorderRadii[0].width, br->mBorderRadii[0].height),
-                                                     LayerSize(br->mBorderRadii[1].width, br->mBorderRadii[1].height),
-                                                     LayerSize(br->mBorderRadii[3].width, br->mBorderRadii[3].height),
-                                                     LayerSize(br->mBorderRadii[2].width, br->mBorderRadii[2].height));
+
+  WrBorderRadius borderRadius =
+    wr::ToWrBorderRadius(
+      LayerSize(br->mBorderRadii[eCornerTopLeft].width, br->mBorderRadii[eCornerTopLeft].height),
+      LayerSize(br->mBorderRadii[eCornerTopRight].width, br->mBorderRadii[eCornerTopRight].height),
+      LayerSize(br->mBorderRadii[eCornerBottomLeft].width, br->mBorderRadii[eCornerBottomLeft].height),
+      LayerSize(br->mBorderRadii[eCornerBottomRight].width, br->mBorderRadii[eCornerBottomRight].height));
+
   aBuilder.PushBorder(wr::ToWrRect(outlineTransformedRect),
                       wr::ToWrRect(outlineTransformedRect),
+                      wr::ToWrBorderWidths(br->mBorderWidths[0], br->mBorderWidths[1],
+                                           br->mBorderWidths[2], br->mBorderWidths[3]),
                       side[0], side[1], side[2], side[3],
                       borderRadius);
 }
