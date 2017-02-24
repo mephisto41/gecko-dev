@@ -268,6 +268,45 @@ private:
   void DrawRectangularCompositeColors();
 };
 
+class nsCSSBorderImageRenderer final
+{
+  typedef mozilla::nsImageRenderer nsImageRenderer;
+public:
+  static mozilla::Maybe<nsCSSBorderImageRenderer>
+  CreateBorderImageRenderer(nsPresContext* aPresContext,
+                            nsIFrame* aForFrame,
+                            const nsRect& aBorderArea,
+                            const nsStyleBorder& aStyleBorder,
+                            const nsRect& aDirtyRect,
+                            nsIFrame::Sides aSkipSides,
+                            uint32_t aFlags,
+                            mozilla::image::DrawResult* aDrawResult);
+
+  mozilla::image::DrawResult
+  DrawBorderImage(nsPresContext* aPresContext,
+                  nsRenderingContext& aRenderingContext,
+                  nsIFrame* aForFrame,
+                  const nsRect& aDirtyRect);
+
+private:
+  nsCSSBorderImageRenderer(nsIFrame* aForFrame,
+                           const nsRect& aBorderArea,
+                           const nsStyleBorder& aStyleBorder,
+                           nsIFrame::Sides aSkipSides,
+                           const nsImageRenderer& aImageRenderer);
+
+  nsImageRenderer mImageRenderer;
+  nsSize mImageSize;
+  nsMargin mSlice;
+  nsMargin mWidths;
+  nsMargin mImageOutset;
+  nsRect mArea;
+  nsRect mClip;
+  uint8_t mRepeatModeHorizontal;
+  uint8_t mRepeatModeVertical;
+  uint8_t mFill;
+};
+
 namespace mozilla {
 #ifdef DEBUG_NEW_BORDERS
 #include <stdarg.h>
