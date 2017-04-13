@@ -50,6 +50,9 @@
 #include "nsStyleChangeList.h"
 #include <algorithm>
 
+#include "gfxPrefs.h"
+#include "mozilla/layers/WebRenderDisplayItemLayer.h"
+
 using namespace mozilla;
 using namespace mozilla::image;
 using namespace mozilla::layout;
@@ -1266,6 +1269,15 @@ public:
 
   virtual void Paint(nsDisplayListBuilder* aBuilder,
                      nsRenderingContext* aCtx) override;
+  virtual already_AddRefed<layers::Layer> BuildLayer(nsDisplayListBuilder* aBuilder,
+                                                     LayerManager* aManager,
+                                                     const ContainerLayerParameters& aContainerParameters) override;
+  virtual void CreateWebRenderCommands(mozilla::wr::DisplayListBuilder& aBuilder,
+                                       nsTArray<WebRenderParentCommand>& aParentCommands,
+                                       WebRenderDisplayItemLayer* aLayer) override;
+  virtual LayerState GetLayerState(nsDisplayListBuilder* aBuilder,
+                                   LayerManager* aManager,
+                                   const ContainerLayerParameters& aParameters) override;
   NS_DISPLAY_DECL_NAME("TableBorderCollapse", TYPE_TABLE_BORDER_COLLAPSE)
 };
 
@@ -1286,6 +1298,34 @@ nsDisplayTableBorderCollapse::Paint(nsDisplayListBuilder* aBuilder,
       drawTarget->GetTransform().PreTranslate(ToPoint(devPixelOffset)));
 
   static_cast<nsTableFrame*>(mFrame)->PaintBCBorders(*drawTarget, mVisibleRect - pt);
+}
+
+already_AddRefed<layers::Layer>
+nsDisplayTableBorderCollapse::BuildLayer(nsDisplayListBuilder* aBuilder,
+                                         LayerManager* aManager,
+                                         const ContainerLayerParameters& aContainerParameters)
+{
+  return BuildDisplayItemLayer(aBuilder, aManager, aContainerParameters);
+}
+
+void
+nsDisplayTableBorderCollapse::CreateWebRenderCommands(mozilla::wr::DisplayListBuilder& aBuilder,
+                                                      nsTArray<WebRenderParentCommand>& aParentCommands,
+                                                      WebRenderDisplayItemLayer* aLayer)
+{
+  static_cast<nsTableFrame*>(mFrame)->CreateWebRenderCommands(aBuilder, aParentCommands, aLayer, ToReferenceFrame());
+}
+
+LayerState
+nsDisplayTableBorderCollapse::GetLayerState(nsDisplayListBuilder* aBuilder,
+                                            LayerManager* aManager,
+                                            const ContainerLayerParameters& aParameters)
+{
+  if (gfxPrefs::LayersAllowTable()) {
+    return LAYER_ACTIVE;
+  }
+
+  return LAYER_NONE;
 }
 
 class nsDisplayTableBackground : public nsDisplayTableItem {
@@ -6402,9 +6442,26 @@ struct BCBlockDirSeg
                      BCPixelSize            aInlineSegBSize);
 
 
+  void BuildBorderParameters(BCPaintBorderIterator& aIter,
+                             BCPixelSize aInlineSegBSize,
+                             uint8_t& aBorderStyle,
+                             nscolor& aBorderColor,
+                             nscolor& aBGColor,
+                             nsRect& aBorderRect,
+                             int32_t& aAppUnitsPerDevPixel,
+                             uint8_t& aStartBevelSide,
+                             nscoord& aStartBevelOffset,
+                             uint8_t& aEndBevelSide,
+                             nscoord& aEndBevelOffset);
   void Paint(BCPaintBorderIterator& aIter,
              DrawTarget&            aDrawTarget,
              BCPixelSize            aInlineSegBSize);
+  void CreateWebRenderCommands(BCPaintBorderIterator& aIter,
+                               BCPixelSize aInlineSegBSize,
+                               wr::DisplayListBuilder& aBuilder,
+                               nsTArray<layers::WebRenderParentCommand>& aParentCommands,
+                               layers::WebRenderDisplayItemLayer* aLayer,
+                               const nsPoint& aPt);
   void AdvanceOffsetB();
   void IncludeCurrentBorder(BCPaintBorderIterator& aIter);
 
@@ -6453,7 +6510,22 @@ struct BCInlineDirSeg
                      BCPixelSize            aIStartSegISize);
   void AdvanceOffsetI();
   void IncludeCurrentBorder(BCPaintBorderIterator& aIter);
+  void BuildBorderParameters(BCPaintBorderIterator& aIter,
+                             uint8_t& aBorderStyle,
+                             nscolor& aBorderColor,
+                             nscolor& aBGColor,
+                             nsRect& aBorderRect,
+                             int32_t& aAppUnitsPerDevPixel,
+                             uint8_t& aStartBevelSide,
+                             nscoord& aStartBevelOffset,
+                             uint8_t& aEndBevelSide,
+                             nscoord& aEndBevelOffset);
   void Paint(BCPaintBorderIterator& aIter, DrawTarget& aDrawTarget);
+  void CreateWebRenderCommands(BCPaintBorderIterator& aIter,
+                               wr::DisplayListBuilder& aBuilder,
+                               nsTArray<layers::WebRenderParentCommand>& aParentCommands,
+                               layers::WebRenderDisplayItemLayer* aLayer,
+                               const nsPoint& aPt);
 
   nscoord            mOffsetI;       // i-offset with respect to the table edge
   nscoord            mOffsetB;       // b-offset with respect to the table edge
@@ -6474,6 +6546,66 @@ struct BCInlineDirSeg
   nsTableCellFrame*  mAjaCell;           // neighboring cell to the first cell
                                          // where the segment starts, it can be
                                          // the owner of a segment
+};
+
+struct BCPaintData
+{
+  BCPaintData(DrawTarget& aDrawTarget)
+    : mDrawTarget(aDrawTarget)
+  {
+  }
+
+  DrawTarget& mDrawTarget;
+};
+
+struct BCCreateWebRenderCommandsData
+{
+  BCCreateWebRenderCommandsData(wr::DisplayListBuilder& aBuilder,
+                                nsTArray<layers::WebRenderParentCommand>& aParentCommands,
+                                layers::WebRenderDisplayItemLayer* aLayer,
+                                const nsPoint& aPt)
+    : mBuilder(aBuilder)
+    , mParentCommands(aParentCommands)
+    , mLayer(aLayer)
+    , mPt(aPt)
+  {
+  }
+
+  wr::DisplayListBuilder& mBuilder;
+  nsTArray<layers::WebRenderParentCommand>& mParentCommands;
+  layers::WebRenderDisplayItemLayer* mLayer;
+  const nsPoint& mPt;
+};
+
+struct BCPaintBorderAction
+{
+  explicit BCPaintBorderAction(DrawTarget& aDrawTarget)
+    : mMode(Mode::PAINT)
+    , mPaintData(aDrawTarget)
+  {
+  }
+
+  BCPaintBorderAction(wr::DisplayListBuilder& aBuilder,
+                      nsTArray<layers::WebRenderParentCommand>& aParentCommands,
+                      layers::WebRenderDisplayItemLayer* aLayer,
+                      const nsPoint& aPt)
+    : mMode(Mode::CREATE_WEBRENDER_COMMANDS)
+    , mCreateWebRenderCommandsData(aBuilder, aParentCommands, aLayer, aPt)
+  {
+    mMode = Mode::CREATE_WEBRENDER_COMMANDS;
+  }
+
+  enum class Mode {
+    PAINT,
+    CREATE_WEBRENDER_COMMANDS,
+  };
+
+  Mode mMode;
+
+  union {
+    BCPaintData mPaintData;
+    BCCreateWebRenderCommandsData mCreateWebRenderCommandsData;
+  };
 };
 
 // Iterates over borders (iStart border, corner, bStart border) in the cell map within a damage area
@@ -6497,8 +6629,8 @@ public:
   bool SetDamageArea(const nsRect& aDamageRect);
   void First();
   void Next();
-  void AccumulateOrPaintInlineDirSegment(DrawTarget& aDrawTarget);
-  void AccumulateOrPaintBlockDirSegment(DrawTarget& aDrawTarget);
+  void AccumulateOrDoActionInlineDirSegment(BCPaintBorderAction& aAction);
+  void AccumulateOrDoActionBlockDirSegment(BCPaintBorderAction& aAction);
   void ResetVerInfo();
   void StoreColumnWidth(int32_t aIndex);
   bool BlockDirSegmentOwnsCorner();
@@ -7121,17 +7253,18 @@ BCBlockDirSeg::GetBEndCorner(BCPaintBorderIterator& aIter,
    mLength += mBEndOffset;
 }
 
-/**
- * Paint the block-dir segment
- * @param aIter           - iterator containing the structural information
- * @param aDrawTarget     - the draw target
- * @param aInlineSegBSize - the width of the inline-dir segment joining the
- *                          corner at the start
- */
 void
-BCBlockDirSeg::Paint(BCPaintBorderIterator& aIter,
-                     DrawTarget&            aDrawTarget,
-                     BCPixelSize            aInlineSegBSize)
+BCBlockDirSeg::BuildBorderParameters(BCPaintBorderIterator& aIter,
+                                     BCPixelSize aInlineSegBSize,
+                                     uint8_t& aBorderStyle,
+                                     nscolor& aBorderColor,
+                                     nscolor& aBGColor,
+                                     nsRect& aBorderRect,
+                                     int32_t& aAppUnitsPerDevPixel,
+                                     uint8_t& aStartBevelSide,
+                                     nscoord& aStartBevelOffset,
+                                     uint8_t& aEndBevelSide,
+                                     nscoord& aEndBevelOffset)
 {
   // get the border style, color and paint the segment
   LogicalSide side =
@@ -7140,12 +7273,12 @@ BCBlockDirSeg::Paint(BCPaintBorderIterator& aIter,
   nsTableColFrame* col           = mCol; if (!col) ABORT0();
   nsTableCellFrame* cell         = mFirstCell; // ???
   nsIFrame* owner = nullptr;
-  uint8_t style = NS_STYLE_BORDER_STYLE_SOLID;
-  nscolor color = 0xFFFFFFFF;
+  aBorderStyle = NS_STYLE_BORDER_STYLE_SOLID;
+  aBorderColor = 0xFFFFFFFF;
 
   // All the tables frames have the same presContext, so we just use any one
   // that exists here:
-  int32_t appUnitsPerDevPixel = col->PresContext()->AppUnitsPerDevPixel();
+  aAppUnitsPerDevPixel = col->PresContext()->AppUnitsPerDevPixel();
 
   switch (mOwner) {
     case eTableOwner:
@@ -7196,7 +7329,7 @@ BCBlockDirSeg::Paint(BCPaintBorderIterator& aIter,
       break;
   }
   if (owner) {
-    ::GetPaintStyleInfo(owner, aIter.mTableWM, side, &style, &color);
+    ::GetPaintStyleInfo(owner, aIter.mTableWM, side, &aBorderStyle, &aBorderColor);
   }
   BCPixelSize smallHalf, largeHalf;
   DivideBCBorderSize(mWidth, smallHalf, largeHalf);
@@ -7211,17 +7344,16 @@ BCBlockDirSeg::Paint(BCPaintBorderIterator& aIter,
 
   // Convert logical to physical sides/coordinates for DrawTableBorderSegment.
 
-  nsRect physicalRect = segRect.GetPhysicalRect(aIter.mTableWM,
-                                                aIter.mTable->GetSize());
+  aBorderRect = segRect.GetPhysicalRect(aIter.mTableWM, aIter.mTable->GetSize());
   // XXX For reversed vertical writing-modes (with direction:rtl), we need to
   // invert physicalRect's y-position here, with respect to the table.
   // However, it's not worth fixing the border positions here until the
   // ordering of the table columns themselves is also fixed (bug 1180528).
 
-  uint8_t startBevelSide = aIter.mTableWM.PhysicalSide(mBStartBevelSide);
-  uint8_t endBevelSide = aIter.mTableWM.PhysicalSide(bEndBevelSide);
-  nscoord startBevelOffset = mBStartBevelOffset;
-  nscoord endBevelOffset = bEndBevelOffset;
+  aStartBevelSide = aIter.mTableWM.PhysicalSide(mBStartBevelSide);
+  aEndBevelSide = aIter.mTableWM.PhysicalSide(bEndBevelSide);
+  aStartBevelOffset = mBStartBevelOffset;
+  aEndBevelOffset = bEndBevelOffset;
   // In vertical-rl mode, the 'start' and 'end' of the block-dir (horizontal)
   // border segment need to be swapped because DrawTableBorderSegment will
   // apply the 'start' bevel at the left edge, and 'end' at the right.
@@ -7233,15 +7365,87 @@ BCBlockDirSeg::Paint(BCPaintBorderIterator& aIter,
   // end of the border-segment. We've got them reversed, since our block dir
   // is RTL, so we have to swap them here.)
   if (aIter.mTableWM.IsVerticalRL()) {
-    Swap(startBevelSide, endBevelSide);
-    Swap(startBevelOffset, endBevelOffset);
+    Swap(aStartBevelSide, aEndBevelSide);
+    Swap(aStartBevelOffset, aEndBevelOffset);
   }
-  nsCSSRendering::DrawTableBorderSegment(aDrawTarget, style, color,
-                                         aIter.mTableBgColor, physicalRect,
+}
+
+/**
+ * Paint the block-dir segment
+ * @param aIter           - iterator containing the structural information
+ * @param aDrawTarget     - the draw target
+ * @param aInlineSegBSize - the width of the inline-dir segment joining the
+ *                          corner at the start
+ */
+void
+BCBlockDirSeg::Paint(BCPaintBorderIterator& aIter,
+                     DrawTarget&            aDrawTarget,
+                     BCPixelSize            aInlineSegBSize)
+{
+  uint8_t borderStyle;
+  nscolor borderColor;
+  nscolor bgColor;
+  nsRect borderRect;
+  int32_t appUnitsPerDevPixel;
+  uint8_t startBevelSide;
+  nscoord startBevelOffset;
+  uint8_t endBevelSide;
+  nscoord endBevelOffset;
+
+  BuildBorderParameters(aIter, aInlineSegBSize, borderStyle, borderColor, bgColor, borderRect,
+                        appUnitsPerDevPixel, startBevelSide, startBevelOffset, endBevelSide, endBevelOffset);
+
+  nsCSSRendering::DrawTableBorderSegment(aDrawTarget, borderStyle, borderColor,
+                                         bgColor, borderRect,
                                          appUnitsPerDevPixel,
                                          nsPresContext::AppUnitsPerCSSPixel(),
                                          startBevelSide, startBevelOffset,
                                          endBevelSide, endBevelOffset);
+}
+
+void
+BCBlockDirSeg::CreateWebRenderCommands(BCPaintBorderIterator& aIter,
+                                       BCPixelSize aInlineSegBSize,
+                                       wr::DisplayListBuilder& aBuilder,
+                                       nsTArray<layers::WebRenderParentCommand>& aParentCommands,
+                                       layers::WebRenderDisplayItemLayer* aLayer,
+                                       const nsPoint& aPt)
+{
+  uint8_t borderStyle;
+  nscolor borderColor;
+  nscolor bgColor;
+  nsRect borderRect;
+  int32_t appUnitsPerDevPixel;
+  uint8_t startBevelSide;
+  nscoord startBevelOffset;
+  uint8_t endBevelSide;
+  nscoord endBevelOffset;
+
+  BuildBorderParameters(aIter, aInlineSegBSize, borderStyle, borderColor, bgColor, borderRect,
+                        appUnitsPerDevPixel, startBevelSide, startBevelOffset, endBevelSide, endBevelOffset);
+
+  Rect transformedRect = aLayer->RelativeToParent(NSRectToRect(borderRect + aPt, appUnitsPerDevPixel));
+  WrBorderSide wrSide[4];
+  NS_FOR_CSS_SIDES(i) {
+    wrSide[i] = wr::ToWrBorderSide(ToDeviceColor(borderColor), NS_STYLE_BORDER_STYLE_NONE);
+  }
+  wrSide[eSideLeft] = wr::ToWrBorderSide(ToDeviceColor(borderColor), borderStyle);
+
+  WrBorderRadius borderRadius = wr::ToWrBorderRadius(LayerSize(0, 0),
+                                                     LayerSize(0, 0),
+                                                     LayerSize(0, 0),
+                                                     LayerSize(0, 0));
+  WrBorderWidths borderWidths = wr::ToWrBorderWidths(transformedRect.Width(),
+                                                     transformedRect.Width(),
+                                                     transformedRect.Width(),
+                                                     transformedRect.Width());
+  WrClipRegion clipRegion = aBuilder.BuildClipRegion(wr::ToWrRect(transformedRect));
+  transformedRect.SetRightEdge(transformedRect.XMost() + transformedRect.Width());
+  aBuilder.PushBorder(wr::ToWrRect(transformedRect),
+                      clipRegion,
+                      borderWidths,
+                      wrSide[0], wrSide[1], wrSide[2], wrSide[3],
+                      borderRadius);
 }
 
 /**
@@ -7336,13 +7540,17 @@ BCInlineDirSeg::GetIEndCorner(BCPaintBorderIterator& aIter,
   mIEndBevelSide = (aIStartSegISize > 0) ? eLogicalSideBEnd : eLogicalSideBStart;
 }
 
-/**
- * Paint the inline-dir segment
- * @param aIter       - iterator containing the structural information
- * @param aDrawTarget - the draw target
- */
 void
-BCInlineDirSeg::Paint(BCPaintBorderIterator& aIter, DrawTarget& aDrawTarget)
+BCInlineDirSeg::BuildBorderParameters(BCPaintBorderIterator& aIter,
+                                      uint8_t& aBorderStyle,
+                                      nscolor& aBorderColor,
+                                      nscolor& aBGColor,
+                                      nsRect& aBorderRect,
+                                      int32_t& aAppUnitsPerDevPixel,
+                                      uint8_t& aStartBevelSide,
+                                      nscoord& aStartBevelOffset,
+                                      uint8_t& aEndBevelSide,
+                                      nscoord& aEndBevelOffset)
 {
   // get the border style, color and paint the segment
   LogicalSide side =
@@ -7355,10 +7563,10 @@ BCInlineDirSeg::Paint(BCPaintBorderIterator& aIter, DrawTarget& aDrawTarget)
 
   // All the tables frames have the same presContext, so we just use any one
   // that exists here:
-  int32_t appUnitsPerDevPixel = row->PresContext()->AppUnitsPerDevPixel();
+  aAppUnitsPerDevPixel = row->PresContext()->AppUnitsPerDevPixel();
 
-  uint8_t style = NS_STYLE_BORDER_STYLE_SOLID;
-  nscolor color = 0xFFFFFFFF;
+  aBorderStyle = NS_STYLE_BORDER_STYLE_SOLID;
+  aBorderColor = 0xFFFFFFFF;
 
   switch (mOwner) {
     case eTableOwner:
@@ -7407,7 +7615,7 @@ BCInlineDirSeg::Paint(BCPaintBorderIterator& aIter, DrawTarget& aDrawTarget)
       break;
   }
   if (owner) {
-    ::GetPaintStyleInfo(owner, aIter.mTableWM, side, &style, &color);
+    ::GetPaintStyleInfo(owner, aIter.mTableWM, side, &aBorderStyle, &aBorderColor);
   }
   BCPixelSize smallHalf, largeHalf;
   DivideBCBorderSize(mWidth, smallHalf, largeHalf);
@@ -7417,13 +7625,12 @@ BCInlineDirSeg::Paint(BCPaintBorderIterator& aIter, DrawTarget& aDrawTarget)
                       nsPresContext::CSSPixelsToAppUnits(mWidth));
 
   // Convert logical to physical sides/coordinates for DrawTableBorderSegment.
-  nsRect physicalRect = segRect.GetPhysicalRect(aIter.mTableWM,
-                                                aIter.mTable->GetSize());
-  uint8_t startBevelSide = aIter.mTableWM.PhysicalSide(mIStartBevelSide);
-  uint8_t endBevelSide = aIter.mTableWM.PhysicalSide(mIEndBevelSide);
-  nscoord startBevelOffset =
+  aBorderRect = segRect.GetPhysicalRect(aIter.mTableWM, aIter.mTable->GetSize());
+  aStartBevelSide = aIter.mTableWM.PhysicalSide(mIStartBevelSide);
+  aEndBevelSide = aIter.mTableWM.PhysicalSide(mIEndBevelSide);
+  aStartBevelOffset =
     nsPresContext::CSSPixelsToAppUnits(mIStartBevelOffset);
-  nscoord endBevelOffset = mIEndBevelOffset;
+  aEndBevelOffset = mIEndBevelOffset;
   // With inline-RTL directionality, the 'start' and 'end' of the inline-dir
   // border segment need to be swapped because DrawTableBorderSegment will
   // apply the 'start' bevel physically at the left or top edge, and 'end' at
@@ -7437,15 +7644,82 @@ BCInlineDirSeg::Paint(BCPaintBorderIterator& aIter, DrawTarget& aDrawTarget)
   // "end" will be reversed from this physical-coord view, so we have to swap
   // them here.
   if (!aIter.mTableWM.IsBidiLTR()) {
-    Swap(startBevelSide, endBevelSide);
-    Swap(startBevelOffset, endBevelOffset);
+    Swap(aStartBevelSide, aEndBevelSide);
+    Swap(aStartBevelOffset, aEndBevelOffset);
   }
-  nsCSSRendering::DrawTableBorderSegment(aDrawTarget, style, color,
-                                         aIter.mTableBgColor, physicalRect,
+}
+
+/**
+ * Paint the inline-dir segment
+ * @param aIter       - iterator containing the structural information
+ * @param aDrawTarget - the draw target
+ */
+void
+BCInlineDirSeg::Paint(BCPaintBorderIterator& aIter, DrawTarget& aDrawTarget)
+{
+  uint8_t borderStyle;
+  nscolor borderColor;
+  nscolor bgColor;
+  nsRect borderRect;
+  int32_t appUnitsPerDevPixel;
+  uint8_t startBevelSide;
+  nscoord startBevelOffset;
+  uint8_t endBevelSide;
+  nscoord endBevelOffset;
+
+  BuildBorderParameters(aIter, borderStyle, borderColor, bgColor, borderRect, appUnitsPerDevPixel,
+                        startBevelSide, startBevelOffset, endBevelSide, endBevelOffset);
+
+  nsCSSRendering::DrawTableBorderSegment(aDrawTarget, borderStyle, borderColor,
+                                         bgColor, borderRect,
                                          appUnitsPerDevPixel,
                                          nsPresContext::AppUnitsPerCSSPixel(),
                                          startBevelSide, startBevelOffset,
                                          endBevelSide, endBevelOffset);
+}
+
+void
+BCInlineDirSeg::CreateWebRenderCommands(BCPaintBorderIterator& aIter,
+                                        wr::DisplayListBuilder& aBuilder,
+                                        nsTArray<layers::WebRenderParentCommand>& aParentCommands,
+                                        layers::WebRenderDisplayItemLayer* aLayer,
+                                        const nsPoint& aPt)
+{
+  uint8_t borderStyle;
+  nscolor borderColor;
+  nscolor bgColor;
+  nsRect borderRect;
+  int32_t appUnitsPerDevPixel;
+  uint8_t startBevelSide;
+  nscoord startBevelOffset;
+  uint8_t endBevelSide;
+  nscoord endBevelOffset;
+
+  BuildBorderParameters(aIter, borderStyle, borderColor, bgColor, borderRect, appUnitsPerDevPixel,
+                        startBevelSide, startBevelOffset, endBevelSide, endBevelOffset);
+
+  Rect transformedRect = aLayer->RelativeToParent(NSRectToRect(borderRect + aPt, appUnitsPerDevPixel));
+  WrBorderSide wrSide[4];
+  NS_FOR_CSS_SIDES(i) {
+    wrSide[i] = wr::ToWrBorderSide(ToDeviceColor(borderColor), NS_STYLE_BORDER_STYLE_NONE);
+  }
+  wrSide[eSideTop] = wr::ToWrBorderSide(ToDeviceColor(borderColor), borderStyle);
+
+  WrBorderRadius borderRadius = wr::ToWrBorderRadius(LayerSize(0, 0),
+                                                     LayerSize(0, 0),
+                                                     LayerSize(0, 0),
+                                                     LayerSize(0, 0));
+  WrBorderWidths borderWidths = wr::ToWrBorderWidths(transformedRect.Height(),
+                                                     transformedRect.Height(),
+                                                     transformedRect.Height(),
+                                                     transformedRect.Height());
+  WrClipRegion clipRegion = aBuilder.BuildClipRegion(wr::ToWrRect(transformedRect));
+  transformedRect.SetBottomEdge(transformedRect.YMost() + transformedRect.Height());
+  aBuilder.PushBorder(wr::ToWrRect(transformedRect),
+                      clipRegion,
+                      borderWidths,
+                      wrSide[0], wrSide[1], wrSide[2], wrSide[3],
+                      borderRadius);
 }
 
 /**
@@ -7502,7 +7776,7 @@ BCPaintBorderIterator::BlockDirSegmentOwnsCorner()
  * @param aDrawTarget - the draw target
  */
 void
-BCPaintBorderIterator::AccumulateOrPaintInlineDirSegment(DrawTarget& aDrawTarget)
+BCPaintBorderIterator::AccumulateOrDoActionInlineDirSegment(BCPaintBorderAction& aAction)
 {
 
   int32_t relColIndex = GetRelativeColIndex();
@@ -7535,7 +7809,16 @@ BCPaintBorderIterator::AccumulateOrPaintInlineDirSegment(DrawTarget& aDrawTarget
     if (mInlineSeg.mLength > 0) {
       mInlineSeg.GetIEndCorner(*this, iStartSegISize);
       if (mInlineSeg.mWidth > 0) {
-        mInlineSeg.Paint(*this, aDrawTarget);
+        if (aAction.mMode == BCPaintBorderAction::Mode::PAINT) {
+          mInlineSeg.Paint(*this, aAction.mPaintData.mDrawTarget);
+        } else {
+          MOZ_ASSERT(aAction.mMode == BCPaintBorderAction::Mode::CREATE_WEBRENDER_COMMANDS);
+          mInlineSeg.CreateWebRenderCommands(*this,
+                                             aAction.mCreateWebRenderCommandsData.mBuilder,
+                                             aAction.mCreateWebRenderCommandsData.mParentCommands,
+                                             aAction.mCreateWebRenderCommandsData.mLayer,
+                                             aAction.mCreateWebRenderCommandsData.mPt);
+        }
       }
       mInlineSeg.AdvanceOffsetI();
     }
@@ -7545,12 +7828,13 @@ BCPaintBorderIterator::AccumulateOrPaintInlineDirSegment(DrawTarget& aDrawTarget
   mBlockDirInfo[relColIndex].mWidth = iStartSegISize;
   mBlockDirInfo[relColIndex].mLastCell = mCell;
 }
+
 /**
  * Paint if necessary a block-dir segment, otherwise accumulate it
  * @param aDrawTarget - the draw target
  */
 void
-BCPaintBorderIterator::AccumulateOrPaintBlockDirSegment(DrawTarget& aDrawTarget)
+BCPaintBorderIterator::AccumulateOrDoActionBlockDirSegment(BCPaintBorderAction& aAction)
 {
   BCBorderOwner borderOwner = eCellOwner;
   BCBorderOwner ignoreBorderOwner;
@@ -7577,7 +7861,17 @@ BCPaintBorderIterator::AccumulateOrPaintBlockDirSegment(DrawTarget& aDrawTarget)
     if (blockDirSeg.mLength > 0) {
       blockDirSeg.GetBEndCorner(*this, inlineSegBSize);
       if (blockDirSeg.mWidth > 0) {
-        blockDirSeg.Paint(*this, aDrawTarget, inlineSegBSize);
+        if (aAction.mMode == BCPaintBorderAction::Mode::PAINT) {
+          blockDirSeg.Paint(*this, aAction.mPaintData.mDrawTarget, inlineSegBSize);
+        } else {
+          MOZ_ASSERT(aAction.mMode == BCPaintBorderAction::Mode::CREATE_WEBRENDER_COMMANDS);
+          blockDirSeg.CreateWebRenderCommands(*this,
+                                              inlineSegBSize,
+                                              aAction.mCreateWebRenderCommandsData.mBuilder,
+                                              aAction.mCreateWebRenderCommandsData.mParentCommands,
+                                              aAction.mCreateWebRenderCommandsData.mLayer,
+                                              aAction.mCreateWebRenderCommandsData.mPt);
+        }
       }
       blockDirSeg.AdvanceOffsetB();
     }
@@ -7602,14 +7896,8 @@ BCPaintBorderIterator::ResetVerInfo()
   }
 }
 
-/**
- * Method to paint BCBorders, this does not use currently display lists although
- * it will do this in future
- * @param aDrawTarget - the rendering context
- * @param aDirtyRect  - inside this rectangle the BC Borders will redrawn
- */
 void
-nsTableFrame::PaintBCBorders(DrawTarget& aDrawTarget, const nsRect& aDirtyRect)
+nsTableFrame::IterateBCBorders(BCPaintBorderAction& aAction, const nsRect& aDirtyRect)
 {
   // We first transfer the aDirtyRect into cellmap coordinates to compute which
   // cell borders need to be painted
@@ -7628,7 +7916,7 @@ nsTableFrame::PaintBCBorders(DrawTarget& aDrawTarget, const nsRect& aDirtyRect)
   // this we  the now active segment with the current border. These
   // segments are stored in mBlockDirInfo to be used on the next row
   for (iter.First(); !iter.mAtEnd; iter.Next()) {
-    iter.AccumulateOrPaintBlockDirSegment(aDrawTarget);
+    iter.AccumulateOrDoActionBlockDirSegment(aAction);
   }
 
   // Next, paint all of the inline-dir border segments from bStart to bEnd reuse
@@ -7636,8 +7924,33 @@ nsTableFrame::PaintBCBorders(DrawTarget& aDrawTarget, const nsRect& aDirtyRect)
   // corner calculations
   iter.Reset();
   for (iter.First(); !iter.mAtEnd; iter.Next()) {
-    iter.AccumulateOrPaintInlineDirSegment(aDrawTarget);
+    iter.AccumulateOrDoActionInlineDirSegment(aAction);
   }
+}
+
+/**
+ * Method to paint BCBorders, this does not use currently display lists although
+ * it will do this in future
+ * @param aDrawTarget - the rendering context
+ * @param aDirtyRect  - inside this rectangle the BC Borders will redrawn
+ */
+void
+nsTableFrame::PaintBCBorders(DrawTarget& aDrawTarget, const nsRect& aDirtyRect)
+{
+  BCPaintBorderAction action(aDrawTarget);
+  IterateBCBorders(action, aDirtyRect);
+}
+
+void
+nsTableFrame::CreateWebRenderCommands(wr::DisplayListBuilder& aBuilder,
+                                      nsTArray<layers::WebRenderParentCommand>& aParentCommands,
+                                      layers::WebRenderDisplayItemLayer* aLayer,
+                                      const nsPoint& aPt)
+{
+  BCPaintBorderAction action(aBuilder, aParentCommands, aLayer, aPt);
+  // We always draw whole table border for webrender. Passing the table rect as
+  // dirty rect.
+  IterateBCBorders(action, GetRect());
 }
 
 bool

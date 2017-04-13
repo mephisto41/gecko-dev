@@ -17,6 +17,7 @@
 #include "nsDisplayList.h"
 #include "TableArea.h"
 
+struct BCPaintBorderAction;
 class nsTableCellFrame;
 class nsTableCellMap;
 class nsTableColFrame;
@@ -310,6 +311,10 @@ public:
   bool BCRecalcNeeded(nsStyleContext* aOldStyleContext,
                         nsStyleContext* aNewStyleContext);
   void PaintBCBorders(DrawTarget& aDrawTarget, const nsRect& aDirtyRect);
+  void CreateWebRenderCommands(mozilla::wr::DisplayListBuilder& aBuilder,
+                               nsTArray<mozilla::layers::WebRenderParentCommand>& aParentCommands,
+                               mozilla::layers::WebRenderDisplayItemLayer* aLayer,
+                               const nsPoint& aPt);
 
   virtual void MarkIntrinsicISizesDirty() override;
   // For border-collapse tables, the caller must not add padding and
@@ -618,6 +623,8 @@ protected:
   void InitChildReflowInput(ReflowInput& aReflowInput);
 
   virtual LogicalSides GetLogicalSkipSides(const ReflowInput* aReflowInput = nullptr) const override;
+
+  void IterateBCBorders(BCPaintBorderAction& aAction, const nsRect& aDirtyRect);
 
 public:
   bool IsRowInserted() const;
