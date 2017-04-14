@@ -1248,23 +1248,63 @@ nsDisplayTableItem::ComputeInvalidationRegion(nsDisplayListBuilder* aBuilder,
   nsDisplayItem::ComputeInvalidationRegion(aBuilder, aGeometry, aInvalidRegion);
 }
 
-class nsDisplayTableBorderBackground : public nsDisplayTableItem {
+// A display item that draws all collapsed borders for a table.
+// At some point, we may want to find a nicer partitioning for dividing
+// border-collapse segments into their own display items.
+class nsDisplayTableBorderCollapse : public nsDisplayTableItem {
 public:
-  nsDisplayTableBorderBackground(nsDisplayListBuilder* aBuilder,
-                                 nsTableFrame* aFrame,
-                                 bool aDrawsBackground) :
-    nsDisplayTableItem(aBuilder, aFrame, aDrawsBackground) {
-    MOZ_COUNT_CTOR(nsDisplayTableBorderBackground);
-  }
+  nsDisplayTableBorderCollapse(nsDisplayListBuilder* aBuilder,
+                               nsTableFrame* aFrame)
+    : nsDisplayTableItem(aBuilder, aFrame) {
+    MOZ_COUNT_CTOR(nsDisplayTableBorderCollapse);
+    }
 #ifdef NS_BUILD_REFCNT_LOGGING
-  virtual ~nsDisplayTableBorderBackground() {
-    MOZ_COUNT_DTOR(nsDisplayTableBorderBackground);
+  virtual ~nsDisplayTableBorderCollapse() {
+    MOZ_COUNT_DTOR(nsDisplayTableBorderCollapse);
   }
 #endif
 
   virtual void Paint(nsDisplayListBuilder* aBuilder,
                      nsRenderingContext* aCtx) override;
-  NS_DISPLAY_DECL_NAME("TableBorderBackground", TYPE_TABLE_BORDER_BACKGROUND)
+  NS_DISPLAY_DECL_NAME("TableBorderCollapse", TYPE_TABLE_BORDER_COLLAPSE)
+};
+
+void
+nsDisplayTableBorderCollapse::Paint(nsDisplayListBuilder* aBuilder,
+                                    nsRenderingContext* aCtx)
+{
+  nsPoint pt = ToReferenceFrame();
+  DrawTarget* drawTarget = aCtx->GetDrawTarget();
+
+  gfxPoint devPixelOffset =
+    nsLayoutUtils::PointToGfxPoint(pt, mFrame->PresContext()->AppUnitsPerDevPixel());
+
+  // XXX we should probably get rid of this translation at some stage
+  // But that would mean modifying PaintBCBorders, ugh
+  AutoRestoreTransform autoRestoreTransform(drawTarget);
+  drawTarget->SetTransform(
+      drawTarget->GetTransform().PreTranslate(ToPoint(devPixelOffset)));
+
+  static_cast<nsTableFrame*>(mFrame)->PaintBCBorders(*drawTarget, mVisibleRect - pt);
+}
+
+class nsDisplayTableBackground : public nsDisplayTableItem {
+public:
+  nsDisplayTableBackground(nsDisplayListBuilder* aBuilder,
+                                 nsTableFrame* aFrame,
+                                 bool aDrawsBackground) :
+    nsDisplayTableItem(aBuilder, aFrame, aDrawsBackground) {
+    MOZ_COUNT_CTOR(nsDisplayTableBackground);
+  }
+#ifdef NS_BUILD_REFCNT_LOGGING
+  virtual ~nsDisplayTableBackground() {
+    MOZ_COUNT_DTOR(nsDisplayTableBackground);
+  }
+#endif
+
+  virtual void Paint(nsDisplayListBuilder* aBuilder,
+                     nsRenderingContext* aCtx) override;
+  NS_DISPLAY_DECL_NAME("TableBorderBackground", TYPE_TABLE_BACKGROUND)
 };
 
 #ifdef DEBUG
@@ -1282,11 +1322,11 @@ IsFrameAllowedInTable(nsIAtom* aType)
 #endif
 
 void
-nsDisplayTableBorderBackground::Paint(nsDisplayListBuilder* aBuilder,
+nsDisplayTableBackground::Paint(nsDisplayListBuilder* aBuilder,
                                       nsRenderingContext* aCtx)
 {
   DrawResult result = static_cast<nsTableFrame*>(mFrame)->
-    PaintTableBorderBackground(aBuilder, *aCtx, mVisibleRect,
+    PaintTableBackground(aBuilder, *aCtx, mVisibleRect,
                                ToReferenceFrame());
 
   nsDisplayTableItemGeometry::UpdateDrawResult(this, result);
@@ -1480,9 +1520,17 @@ nsTableFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
     if (aBuilder->IsForEventDelivery() ||
         AnyTablePartHasBorderOrBackground(this, this, GetNextSibling()) ||
         AnyTablePartHasBorderOrBackground(this, mColGroups.FirstChild(), nullptr)) {
-      item = new (aBuilder) nsDisplayTableBorderBackground(aBuilder, this,
+      item = new (aBuilder) nsDisplayTableBackground(aBuilder, this,
           deflate != nsMargin(0, 0, 0, 0));
       aLists.BorderBackground()->AppendNewToTop(item);
+
+      if (IsBorderCollapse()) {
+        aLists.BorderBackground()->AppendNewToTop(
+          new (aBuilder) nsDisplayTableBorderCollapse(aBuilder, this));
+      } else {
+        aLists.BorderBackground()->AppendNewToTop(
+          new (aBuilder) nsDisplayBorder(aBuilder, this));
+      }
     }
   }
   DisplayGenericTablePart(aBuilder, this, aDirtyRect, aLists, item);
@@ -1505,17 +1553,14 @@ nsTableFrame::GetDeflationForBackground(nsPresContext* aPresContext) const
 // XXX We don't put the borders and backgrounds in tree order like we should.
 // That requires some major surgery which we aren't going to do right now.
 DrawResult
-nsTableFrame::PaintTableBorderBackground(nsDisplayListBuilder* aBuilder,
-                                         nsRenderingContext& aRenderingContext,
-                                         const nsRect& aDirtyRect,
-                                         nsPoint aPt)
+nsTableFrame::PaintTableBackground(nsDisplayListBuilder* aBuilder,
+                                   nsRenderingContext& aRenderingContext,
+                                   const nsRect& aDirtyRect,
+                                   nsPoint aPt)
 {
   nsPresContext* presContext = PresContext();
 
   uint32_t bgFlags = aBuilder->GetBackgroundPaintFlags();
-  PaintBorderFlags borderFlags = aBuilder->ShouldSyncDecodeImages()
-                               ? PaintBorderFlags::SYNC_DECODE_IMAGES
-                               : PaintBorderFlags();
 
   TableBackgroundPainter painter(this, TableBackgroundPainter::eOrigin_Table,
                                  presContext, aRenderingContext,
@@ -1525,32 +1570,6 @@ nsTableFrame::PaintTableBorderBackground(nsDisplayListBuilder* aBuilder,
   // in a separate display item, so don't do it here.
   DrawResult result =
     painter.PaintTable(this, deflate, deflate != nsMargin(0, 0, 0, 0));
-
-  if (StyleVisibility()->IsVisible()) {
-    if (!IsBorderCollapse()) {
-      Sides skipSides = GetSkipSides();
-      nsRect rect(aPt, mRect.Size());
-
-      result &=
-        nsCSSRendering::PaintBorder(presContext, aRenderingContext, this,
-                                    aDirtyRect, rect, mStyleContext,
-                                    borderFlags, skipSides);
-    } else {
-      DrawTarget* drawTarget = aRenderingContext.GetDrawTarget();
-
-      gfxPoint devPixelOffset =
-        nsLayoutUtils::PointToGfxPoint(aPt,
-                                       PresContext()->AppUnitsPerDevPixel());
-
-      // XXX we should probably get rid of this translation at some stage
-      // But that would mean modifying PaintBCBorders, ugh
-      AutoRestoreTransform autoRestoreTransform(drawTarget);
-      drawTarget->SetTransform(
-        drawTarget->GetTransform().PreTranslate(ToPoint(devPixelOffset)));
-
-      PaintBCBorders(*drawTarget, aDirtyRect - aPt);
-    }
-  }
 
   return result;
 }

@@ -267,13 +267,12 @@ public:
 
   /**
    * Paint the background of the table and its parts (column groups,
-   * columns, row groups, rows, and cells), and the table border, and all
-   * internal borders if border-collapse is on.
+   * columns, row groups, rows, and cells)
    */
-  DrawResult PaintTableBorderBackground(nsDisplayListBuilder* aBuilder,
-                                        nsRenderingContext& aRenderingContext,
-                                        const nsRect& aDirtyRect,
-                                        nsPoint aPt);
+  DrawResult PaintTableBackground(nsDisplayListBuilder* aBuilder,
+                                  nsRenderingContext& aRenderingContext,
+                                  const nsRect& aDirtyRect,
+                                  nsPoint aPt);
 
   /** Get the outer half (i.e., the part outside the height and width of
    *  the table) of the largest segment (?) of border-collapsed border on
