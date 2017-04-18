@@ -515,10 +515,12 @@ function WaitForTestEnd(contentRootElement, inPrintMode, spellCheckedElements) {
                     gFailureReason += " (waiting for MozPaintWaitFinished)";
                     LogInfo("MakeProgress: waiting for MozPaintWaitFinished");
                 }
+                dump("Morris start\n");
                 if (shouldWaitForPendingPaints()) {
                     gFailureReason += " (waiting for MozAfterPaint)";
                     LogInfo("MakeProgress: waiting for MozAfterPaint");
                 }
+                dump("Morris end\n");
                 return;
             }
 

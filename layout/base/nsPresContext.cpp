@@ -154,6 +154,7 @@ nsPresContext::MakeColorPref(const nsString& aColor)
 bool
 nsPresContext::IsDOMPaintEventPending()
 {
+  printf_stderr("Morris IsDOMPaintEventPending: mFireAfterPaintEvents:%d this:%p\n", mFireAfterPaintEvents, this);
   if (mFireAfterPaintEvents) {
     return true;
   }
@@ -2505,6 +2506,7 @@ nsPresContext::NotifyInvalidation(uint64_t aTransactionId, const nsRect& aRect)
     if (pc->mFireAfterPaintEvents)
       break;
     pc->mFireAfterPaintEvents = true;
+    printf_stderr("Morris set fire after paint events. this:%p\n", this);
   }
   if (!pc) {
     nsRootPresContext* rpc = GetRootPresContext();
@@ -2667,6 +2669,7 @@ nsPresContext::NotifyDidPaintForSubtree(uint64_t aTransactionId,
   NotifyDidPaintSubdocumentCallbackClosure closure = { aTransactionId, aTimeStamp, false };
   mDocument->EnumerateSubDocuments(nsPresContext::NotifyDidPaintSubdocumentCallback, &closure);
 
+  printf_stderr("Morris NotifyDidPaintForSubtree this:%p\n", this);
   if (!closure.mNeedsAnotherDidPaintNotification &&
       mTransactions.IsEmpty()) {
     // Nothing more to do for the moment.

@@ -4653,7 +4653,7 @@ pref("layers.deaa.enabled", true);
 pref("layers.deaa.enabled", false);
 #endif
 
-pref("layers.dump", false);
+pref("layers.dump", true);
 #ifdef MOZ_DUMP_PAINTING
 // If we're dumping layers, also dump the texture data
 pref("layers.dump-texture", false);

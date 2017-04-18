@@ -28,7 +28,7 @@
 #include "LayersLogging.h"
 
 // LayerTreeInvalidation debugging
-#define LTI_DEBUG 0
+#define LTI_DEBUG 1
 
 #if LTI_DEBUG
 #  define LTI_DEEPER(aPrefix) nsPrintfCString("%s  ", aPrefix).get()
