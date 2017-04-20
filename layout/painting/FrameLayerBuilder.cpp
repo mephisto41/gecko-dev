@@ -1951,7 +1951,7 @@ FrameLayerBuilder::RemoveFrameFromLayerManager(const nsIFrame* aFrame,
     if (t) {
       PaintedDisplayItemLayerUserData* paintedData =
           static_cast<PaintedDisplayItemLayerUserData*>(t->GetUserData(&gPaintedDisplayItemLayerUserData));
-      if (paintedData && data->mGeometry) {
+      if (paintedData) {
         nsRegion old = data->mGeometry->ComputeInvalidationRegion();
         nsIntRegion rgn = old.ScaleToOutsidePixels(paintedData->mXScale, paintedData->mYScale, paintedData->mAppUnitsPerDevPixel);
         rgn.MoveBy(-GetTranslationForPaintedLayer(t));
@@ -3233,7 +3233,6 @@ void ContainerState::FinishPaintedLayerData(PaintedLayerData& aData, FindOpaqueB
 
     layer = canOptimizeToImageLayer ? PrepareImageLayer(data)
                                     : PrepareColorLayer(data);
-    printf_stderr("Morris canOptimizeToImageLayer %d Layer:%p\n", canOptimizeToImageLayer, layer.get());
 
     if (layer) {
       NS_ASSERTION(FindIndexOfLayerIn(mNewChildLayers, layer) < 0,
@@ -3257,11 +3256,6 @@ void ContainerState::FinishPaintedLayerData(PaintedLayerData& aData, FindOpaqueB
       data->mLayer->SetVisibleRegion(LayerIntRegion());
       data->mLayer->InvalidateRegion(data->mLayer->GetValidRegion().GetBounds());
       data->mLayer->SetEventRegions(EventRegions());
-      for (auto& item : data->mAssignedDisplayItems) {
-        printf_stderr("Morris AddLayerDisplayItem :%p, %s\n", item.mItem, item.mItem->Name());
-        mLayerBuilder->AddLayerDisplayItem(layer, item.mItem, LAYER_ACTIVE, nullptr);
-        printf_stderr("Morris AddLayerDisplayItem end\n");
-      }
     }
   }
 
@@ -4554,10 +4548,6 @@ FrameLayerBuilder::ComputeGeometryChangeForItem(DisplayItemData* aData)
 {
   nsDisplayItem *item = aData->mItem;
   PaintedLayer* paintedLayer = aData->mLayer->AsPaintedLayer();
-  if (aData->mOptLayer) {
-    return;
-  }
-
   if (!item || !paintedLayer) {
     aData->EndUpdate();
     return;
@@ -4656,7 +4646,6 @@ FrameLayerBuilder::ComputeGeometryChangeForItem(DisplayItemData* aData)
     if (notifyRenderingChanged) {
       item->NotifyRenderingChanged();
     }
-    printf_stderr("Morris item:%p invalid. Layer:%p\n", item, paintedLayer);
     InvalidatePostTransformRegion(paintedLayer,
         combined.ScaleToOutsidePixels(layerData->mXScale, layerData->mYScale, layerData->mAppUnitsPerDevPixel),
         layerData->mTranslation);
@@ -4810,9 +4799,7 @@ FrameLayerBuilder::StoreDataForFrame(nsDisplayItem* aItem, Layer* aLayer, LayerS
 {
   DisplayItemData* oldData = GetDisplayItemDataForManager(aItem, mRetainingManager);
   if (oldData) {
-    printf_stderr("Morris oldData data:%p, layer:%p item:%p\n", oldData, aLayer, aItem);
     if (!oldData->mUsed) {
-      printf_stderr("Morris beginupdate data:%p, layer:%p item:%p\n", oldData, aLayer, aItem);
       oldData->BeginUpdate(aLayer, aState, mContainerLayerGeneration, aItem);
     }
     return oldData;
