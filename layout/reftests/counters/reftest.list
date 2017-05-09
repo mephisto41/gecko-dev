@@ -68,7 +68,7 @@ fails-if(xulRuntime.XPCOMABI.match(/arm/)) == counter-ua-limits-02.html counter-
 == counter-ua-limits-list-00.html counter-ua-limits-list-00-ref.html
 == counter-ua-limits-list-01.html counter-ua-limits-list-01-ref.html
 fails-if(stylo) == multiple-thai-counters.html multiple-thai-counters-ref.html
-fails-if(stylo) == counter-suffix.html counter-suffix-ref.html
+fails-if(stylo) fuzzy-if(webrender,255,200) == counter-suffix.html counter-suffix-ref.html
 fails-if(stylo) == counter-cjk-decimal.html counter-cjk-decimal-ref.html
 asserts-if(stylo,4) == counter-japanese-informal.html counter-japanese-informal-ref.html
 asserts-if(stylo,4) == counter-japanese-formal.html counter-japanese-formal-ref.html
