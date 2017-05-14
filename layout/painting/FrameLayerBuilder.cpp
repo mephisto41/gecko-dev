@@ -1618,16 +1618,18 @@ struct CSSMaskLayerUserData : public LayerUserData
     : mMaskStyle(nsStyleImageLayers::LayerType::Mask)
   { }
 
-  CSSMaskLayerUserData(nsIFrame* aFrame, const nsIntSize& aMaskSize)
-    : mMaskSize(aMaskSize),
-      mMaskStyle(aFrame->StyleSVGReset()->mMask)
+  CSSMaskLayerUserData(nsDisplayItem* aItem, const nsRect& aMaskBounds)
+    : mMaskBounds(aMaskBounds),
+      mMaskStyle(aItem->Frame()->StyleSVGReset()->mMask),
+      mMaskLayerOffset(aItem->ToReferenceFrame() - aMaskBounds.TopLeft())
   {
   }
 
   void operator=(CSSMaskLayerUserData&& aOther)
   {
-    mMaskSize = aOther.mMaskSize;
+    mMaskBounds = aOther.mMaskBounds;
     mMaskStyle = Move(aOther.mMaskStyle);
+    mMaskLayerOffset = aOther.mMaskLayerOffset;
   }
 
   bool
@@ -1638,7 +1640,12 @@ struct CSSMaskLayerUserData : public LayerUserData
     // by adding a transform property on it, the masked frame is valid itself
     // but we have to regenerate mask according to the new size in device
     // space.
-    if (mMaskSize != aOther.mMaskSize) {
+    if (mMaskBounds.Size() != aOther.mMaskBounds.Size()) {
+      return false;
+    }
+
+    // Make sure we draw the same portion of the mask onto mask layer.
+    if (mMaskLayerOffset != aOther.mMaskLayerOffset) {
       return false;
     }
 
@@ -1646,8 +1653,9 @@ struct CSSMaskLayerUserData : public LayerUserData
   }
 
 private:
-  nsIntSize mMaskSize;
+  nsRect mMaskBounds;
   nsStyleImageLayers mMaskStyle;
+  nsPoint mMaskLayerOffset; // offset from the origin of mask region to mask layer rect.
 };
 
 /*
@@ -3886,7 +3894,7 @@ ContainerState::SetupMaskLayerForCSSMask(Layer* aLayer,
   matrix.PreTranslate(mParameters.mOffset.x, mParameters.mOffset.y, 0);
   maskLayer->SetBaseTransform(matrix);
 
-  CSSMaskLayerUserData newUserData(aMaskItem->Frame(), itemRect.Size());
+  CSSMaskLayerUserData newUserData(aMaskItem, bounds);
   nsRect dirtyRect;
   if (!aMaskItem->IsInvalid(dirtyRect) && *oldUserData == newUserData) {
     aLayer->SetMaskLayer(maskLayer);
