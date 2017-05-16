@@ -550,6 +550,8 @@ public:
 
     static void
     FlushFontAndWordCaches();
+    static void
+    NotifyGlyphsChanged();
 
     /**
      * Returns a 1x1 surface that can be used to create graphics contexts

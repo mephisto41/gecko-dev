@@ -2059,6 +2059,15 @@ gfxPlatform::FlushFontAndWordCaches()
     gfxPlatform::PurgeSkiaFontCache();
 }
 
+/* static */ void
+gfxPlatform::NotifyGlyphsChanged()
+{
+    gfxFontCache *fontCache = gfxFontCache::GetCache();
+    if (fontCache) {
+        fontCache->NotifyGlyphsChanged();
+    }
+}
+
 void
 gfxPlatform::FontsPrefsChanged(const char *aPref)
 {
@@ -2081,6 +2090,7 @@ gfxPlatform::FontsPrefsChanged(const char *aPref)
     } else if (!strcmp(GFX_PREF_OPENTYPE_SVG, aPref)) {
         mOpenTypeSVGEnabled = UNINITIALIZED_VALUE;
         gfxFontCache::GetCache()->AgeAllGenerations();
+        NotifyGlyphsChanged();
     }
 }
 
