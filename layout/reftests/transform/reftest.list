@@ -3,7 +3,7 @@
 # this test.
 == singular-1a.html about:blank
 # Multiple transforms should act identically to nested divs.
-== compound-1a.html compound-1-ref.html
+fuzzy-if(webrender,1,21) == compound-1a.html compound-1-ref.html
 != compound-1a.html compound-1-fail.html
 == dynamic-inherit-1.html dynamic-inherit-1-ref.html
 == dynamic-addremove-1a.html dynamic-addremove-1-ref.html
@@ -89,7 +89,7 @@ fuzzy-if(skiaContent,2,500) == transform-svg-2a.xhtml transform-svg-2-ref.xhtml
 # skew should allow a mix of one and two parameters.
 == skew-1a.html skew-1-ref.html
 fuzzy-if(skiaContent,1,80) == skew-1b.html skew-1-ref.html
-== skew-2a.html skew-2-ref.html
+fuzzy-if(webrender,1,21) == skew-2a.html skew-2-ref.html
 # matrix with values equal to other transforms should behave indistinguishably
 == matrix-1a.html matrix-1-ref.html
 == matrix-2a.html matrix-2-ref.html
