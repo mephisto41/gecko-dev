@@ -4060,6 +4060,14 @@ nsDisplayImageContainer::CanOptimizeToImageLayer(LayerManager* aManager,
     return false;
   }
 
+  if (mFrame->IsImageFrame()) {
+    // Image layer doesn't support draw focus ring for image map.
+    nsImageFrame* f = static_cast<nsImageFrame*>(mFrame);
+    if (f->HasImageMap()) {
+      return false;
+    }
+  }
+
   return true;
 }
 
