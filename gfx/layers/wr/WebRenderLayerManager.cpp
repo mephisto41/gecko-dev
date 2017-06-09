@@ -19,6 +19,7 @@
 #include "WebRenderPaintedLayerBlob.h"
 #include "WebRenderTextLayer.h"
 #include "WebRenderDisplayItemLayer.h"
+#include "nsDisplayList.h"
 
 namespace mozilla {
 
@@ -165,6 +166,116 @@ PopulateScrollData(WebRenderScrollData& aTarget, Layer* aLayer)
 }
 
 void
+WebRenderLayerManager::EndTransaction2(nsDisplayList* aDisplayList, nsDisplayListBuilder* aBuilder)
+{
+  DiscardImages();
+  WrBridge()->RemoveExpiredFontKeys();
+
+  LayoutDeviceIntSize size = mWidget->GetClientSize();
+  if (!WrBridge()->DPBegin(size.ToUnknownSize())) {
+    return;
+  }
+  StackingContextHelper sc;
+  WrSize contentSize { (float)size.width, (float)size.height };
+  wr::DisplayListBuilder builder(WrBridge()->GetPipeline(), contentSize);
+
+  nsDisplayList savedItems;
+  nsDisplayItem* item;
+  while ((item = aDisplayList->RemoveBottom()) != nullptr) {
+    nsDisplayItem::Type itemType = item->GetType();
+
+    // If the item is a event regions item, but is empty (has no regions in it)
+    // then we should just throw it out
+    if (itemType == nsDisplayItem::TYPE_LAYER_EVENT_REGIONS) {
+      nsDisplayLayerEventRegions* eventRegions =
+        static_cast<nsDisplayLayerEventRegions*>(item);
+      if (eventRegions->IsEmpty()) {
+        item->~nsDisplayItem();
+        continue;
+      }
+    }
+
+    // Peek ahead to the next item and try merging with it or swapping with it
+    // if necessary.
+    nsDisplayItem* aboveItem;
+    while ((aboveItem = aDisplayList->GetBottom()) != nullptr) {
+      if (aboveItem->TryMerge(item)) {
+        aDisplayList->RemoveBottom();
+        item->~nsDisplayItem();
+        item = aboveItem;
+        itemType = item->GetType();
+      } else {
+        break;
+      }
+    }
+
+    nsDisplayList* itemSameCoordinateSystemChildren
+      = item->GetSameCoordinateSystemChildren();
+    if (item->ShouldFlattenAway(aBuilder)) {
+      aDisplayList->AppendToBottom(itemSameCoordinateSystemChildren);
+      item->~nsDisplayItem();
+      continue;
+    }
+
+    savedItems.AppendToTop(item);
+
+
+    nsTArray<WebRenderParentCommand> parentCommands;
+
+    switch (itemType) {
+    case nsDisplayItem::TYPE_BACKGROUND_COLOR:
+    case nsDisplayItem::TYPE_TEXT:
+    case nsDisplayItem::TYPE_CANVAS_BACKGROUND_COLOR:
+      item->CreateWebRenderCommands(builder, sc, parentCommands, nullptr);
+      break;
+    case nsDisplayItem::TYPE_BACKGROUND:
+    case nsDisplayItem::TYPE_IMAGE:
+      item->CreateWebRenderCommands(builder, sc, parentCommands, nullptr, this, aBuilder);
+      break;
+    default:
+      //printf_stderr("@@@DEBUG: Drop display item: %s\n", item->Name());
+      break;
+    }
+
+    WrBridge()->AddWebRenderParentCommands(parentCommands);
+  }
+  aDisplayList->AppendToTop(&savedItems);
+
+  WrBridge()->ClearReadLocks();
+  // We can't finish this transaction so return. This usually
+  // happens in an empty transaction where we can't repaint a painted layer.
+  // In this case, leave the transaction open and let a full transaction happen.
+  if (mTransactionIncomplete) {
+    DiscardLocalImages();
+    return;
+  }
+
+  WebRenderScrollData scrollData;
+  if (AsyncPanZoomEnabled()) {
+    if (mIsFirstPaint) {
+      scrollData.SetIsFirstPaint();
+      mIsFirstPaint = false;
+    }
+    scrollData.SetPaintSequenceNumber(mPaintSequenceNumber);
+    if (mRoot) {
+      PopulateScrollData(scrollData, mRoot.get());
+    }
+  }
+
+  bool sync = mTarget != nullptr;
+  mLatestTransactionId = mTransactionIdAllocator->GetTransactionId();
+
+  WrBridge()->DPEnd(builder, size.ToUnknownSize(), sync, mLatestTransactionId, scrollData);
+
+  MakeSnapshotIfRequired(size);
+  mNeedsComposite = false;
+
+  // this may result in Layers being deleted, which results in
+  // PLayer::Send__delete__() and DeallocShmem()
+  mKeepAlive.Clear();
+}
+
+void
 WebRenderLayerManager::EndTransaction(DrawPaintedLayerCallback aCallback,
                                       void* aCallbackData,
                                       EndTransactionFlags aFlags)
@@ -179,6 +290,9 @@ WebRenderLayerManager::EndTransactionInternal(DrawPaintedLayerCallback aCallback
                                               void* aCallbackData,
                                               EndTransactionFlags aFlags)
 {
+  PROFILER_LABEL("WebRenderLayerManager", "EndTransactionInternal",
+    js::ProfileEntry::Category::GRAPHICS);
+
   mPaintedLayerCallback = aCallback;
   mPaintedLayerCallbackData = aCallbackData;
   mTransactionIncomplete = false;
@@ -318,6 +432,8 @@ WebRenderLayerManager::AddImageKeyForDiscard(wr::ImageKey key)
 void
 WebRenderLayerManager::DiscardImages()
 {
+  PROFILER_LABEL("WebRenderLayerManager", "DiscardImages",
+    js::ProfileEntry::Category::GRAPHICS);
   if (WrBridge()->IPCOpen()) {
     for (auto key : mImageKeys) {
       WrBridge()->SendDeleteImage(key);

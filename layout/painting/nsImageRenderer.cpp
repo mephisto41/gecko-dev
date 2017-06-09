@@ -21,6 +21,7 @@
 #include "nsStyleStructInlines.h"
 #include "nsSVGEffects.h"
 #include "nsSVGIntegrationUtils.h"
+#include "ImageContainer.h"
 
 using namespace mozilla;
 using namespace mozilla::gfx;
@@ -583,6 +584,7 @@ nsImageRenderer::BuildWebRenderDisplayItems(nsPresContext*       aPresContext,
                                             const mozilla::layers::StackingContextHelper& aSc,
                                             nsTArray<WebRenderParentCommand>&           aParentCommands,
                                             mozilla::layers::WebRenderDisplayItemLayer* aLayer,
+                                            mozilla::layers::WebRenderLayerManager* aManager,
                                             const nsRect&        aDirtyRect,
                                             const nsRect&        aDest,
                                             const nsRect&        aFill,
@@ -591,64 +593,154 @@ nsImageRenderer::BuildWebRenderDisplayItems(nsPresContext*       aPresContext,
                                             const CSSIntRect&    aSrc,
                                             float                aOpacity)
 {
-  if (!IsReady()) {
-    NS_NOTREACHED("Ensure PrepareImage() has returned true before calling me");
-    return DrawResult::NOT_READY;
-  }
-  if (aDest.IsEmpty() || aFill.IsEmpty() ||
-      mSize.width <= 0 || mSize.height <= 0) {
+  if (aManager && aLayer) {
+    if (!IsReady()) {
+      NS_NOTREACHED("Ensure PrepareImage() has returned true before calling me");
+      return DrawResult::NOT_READY;
+    }
+    if (aDest.IsEmpty() || aFill.IsEmpty() ||
+        mSize.width <= 0 || mSize.height <= 0) {
+      return DrawResult::SUCCESS;
+    }
+
+    switch (mType) {
+      case eStyleImageType_Gradient:
+      {
+        nsCSSGradientRenderer renderer =
+          nsCSSGradientRenderer::Create(aPresContext, mGradientData, mSize);
+
+        renderer.BuildWebRenderDisplayItems(aBuilder, aSc, aLayer, aDest, aFill, aRepeatSize, aSrc, aOpacity);
+        break;
+      }
+      case eStyleImageType_Image:
+      {
+        RefPtr<layers::ImageContainer> container = mImageContainer->GetImageContainer(aLayer->WrManager(),
+                                                                                      ConvertImageRendererToDrawFlags(mFlags));
+        if (!container) {
+          NS_WARNING("Failed to get image container");
+          return DrawResult::NOT_READY;
+        }
+        Maybe<wr::ImageKey> key = aLayer->SendImageContainer(container, aParentCommands);
+        if (key.isNothing()) {
+          return DrawResult::BAD_IMAGE;
+        }
+
+        const int32_t appUnitsPerDevPixel = mForFrame->PresContext()->AppUnitsPerDevPixel();
+        LayoutDeviceRect destRect = LayoutDeviceRect::FromAppUnits(
+            aDest, appUnitsPerDevPixel);
+
+        nsPoint firstTilePos = nsLayoutUtils::GetBackgroundFirstTilePos(aDest.TopLeft(),
+                                                                        aFill.TopLeft(),
+                                                                        aRepeatSize);
+        LayoutDeviceRect fillRect = LayoutDeviceRect::FromAppUnits(
+            nsRect(firstTilePos.x, firstTilePos.y,
+                   aFill.XMost() - firstTilePos.x, aFill.YMost() - firstTilePos.y),
+            appUnitsPerDevPixel);
+        WrRect fill = aSc.ToRelativeWrRect(fillRect);
+        WrRect clip = aSc.ToRelativeWrRect(
+            LayoutDeviceRect::FromAppUnits(aFill, appUnitsPerDevPixel));
+
+        LayoutDeviceSize gapSize = LayoutDeviceSize::FromAppUnits(
+            aRepeatSize - aDest.Size(), appUnitsPerDevPixel);
+        aBuilder.PushImage(fill, aBuilder.PushClipRegion(clip),
+                           wr::ToWrSize(destRect.Size()), wr::ToWrSize(gapSize),
+                           wr::ImageRendering::Auto, key.value());
+        break;
+      }
+      default:
+        break;
+    }
+
+    return DrawResult::SUCCESS;
+  } else {
+    if (!IsReady()) {
+      NS_NOTREACHED("Ensure PrepareImage() has returned true before calling me");
+      return DrawResult::NOT_READY;
+    }
+    if (aDest.IsEmpty() || aFill.IsEmpty() ||
+        mSize.width <= 0 || mSize.height <= 0) {
+      return DrawResult::SUCCESS;
+    }
+
+    switch (mType) {
+      case eStyleImageType_Gradient:
+      {
+        nsCSSGradientRenderer renderer =
+          nsCSSGradientRenderer::Create(aPresContext, mGradientData, mSize);
+
+        renderer.BuildWebRenderDisplayItems(aBuilder, aSc, aLayer, aDest, aFill, aRepeatSize, aSrc, aOpacity);
+        break;
+      }
+      case eStyleImageType_Image:
+      {
+        RefPtr<layers::ImageContainer> container = mImageContainer->GetImageContainer(aManager,
+                                                                                      ConvertImageRendererToDrawFlags(mFlags));
+        if (!container) {
+          NS_WARNING("Failed to get image container");
+          return DrawResult::NOT_READY;
+        }
+
+        AutoLockImage autoLock(container);
+        mozilla::layers::Image* image = autoLock.GetImage();
+        if (!image) {
+          return DrawResult::SUCCESS;
+        }
+        RefPtr<ImageClient> imageClient = ImageClient::CreateImageClient(CompositableType::IMAGE,
+                                                                           aManager->WrBridge(),
+                                                                           TextureFlags::DEFAULT);
+        if (!imageClient) {
+          return DrawResult::SUCCESS;
+        }
+        imageClient->Connect();
+        wr::ExternalImageId externalImageId = aManager->WrBridge()->AllocExternalImageIdForCompositable(imageClient);
+
+        ImageClientSingle* imageClientSingle = imageClient->AsImageClientSingle();
+        bool ret = imageClientSingle->UpdateImage(container, /* unused */0);
+        if (!ret || imageClientSingle->IsEmpty()) {
+          return DrawResult::SUCCESS;
+        }
+
+        WrImageKey wrkey;
+        wrkey.mNamespace = aManager->WrBridge()->GetNamespace();
+        wrkey.mHandle = aManager->WrBridge()->GetNextResourceId();
+        aManager->WrBridge()->AddWebRenderParentCommand(OpAddExternalImage(externalImageId, wrkey));
+        Maybe<wr::ImageKey> key = Some(wrkey);
+
+
+        if (key.isNothing()) {
+          return DrawResult::BAD_IMAGE;
+        }
+
+        aManager->AddImageKeyForDiscard(key.value());
+
+        const int32_t appUnitsPerDevPixel = mForFrame->PresContext()->AppUnitsPerDevPixel();
+        LayoutDeviceRect destRect = LayoutDeviceRect::FromAppUnits(
+            aDest, appUnitsPerDevPixel);
+
+        nsPoint firstTilePos = nsLayoutUtils::GetBackgroundFirstTilePos(aDest.TopLeft(),
+                                                                        aFill.TopLeft(),
+                                                                        aRepeatSize);
+
+        LayoutDeviceRect fillRect = LayoutDeviceRect::FromAppUnits(
+            nsRect(firstTilePos.x, firstTilePos.y,
+                   aFill.XMost() - firstTilePos.x, aFill.YMost() - firstTilePos.y),
+            appUnitsPerDevPixel);
+
+        WrRect fill = aSc.ToRelativeWrRect(fillRect);
+        WrRect clip = aSc.ToRelativeWrRect(
+            LayoutDeviceRect::FromAppUnits(aFill, appUnitsPerDevPixel));
+        LayoutDeviceSize gapSize = LayoutDeviceSize::FromAppUnits(
+            aRepeatSize - aDest.Size(), appUnitsPerDevPixel);
+        aBuilder.PushImage(fill, aBuilder.PushClipRegion(clip),
+                           wr::ToWrSize(destRect.Size()), wr::ToWrSize(gapSize),
+                           wr::ImageRendering::Auto, key.value());
+        break;
+      }
+      default:
+        break;
+    }
     return DrawResult::SUCCESS;
   }
-
-  switch (mType) {
-    case eStyleImageType_Gradient:
-    {
-      nsCSSGradientRenderer renderer =
-        nsCSSGradientRenderer::Create(aPresContext, mGradientData, mSize);
-
-      renderer.BuildWebRenderDisplayItems(aBuilder, aSc, aLayer, aDest, aFill, aRepeatSize, aSrc, aOpacity);
-      break;
-    }
-    case eStyleImageType_Image:
-    {
-      RefPtr<layers::ImageContainer> container = mImageContainer->GetImageContainer(aLayer->WrManager(),
-                                                                                    ConvertImageRendererToDrawFlags(mFlags));
-      if (!container) {
-        NS_WARNING("Failed to get image container");
-        return DrawResult::NOT_READY;
-      }
-      Maybe<wr::ImageKey> key = aLayer->SendImageContainer(container, aParentCommands);
-      if (key.isNothing()) {
-        return DrawResult::BAD_IMAGE;
-      }
-
-      const int32_t appUnitsPerDevPixel = mForFrame->PresContext()->AppUnitsPerDevPixel();
-      LayoutDeviceRect destRect = LayoutDeviceRect::FromAppUnits(
-          aDest, appUnitsPerDevPixel);
-
-      nsPoint firstTilePos = nsLayoutUtils::GetBackgroundFirstTilePos(aDest.TopLeft(),
-                                                                      aFill.TopLeft(),
-                                                                      aRepeatSize);
-      LayoutDeviceRect fillRect = LayoutDeviceRect::FromAppUnits(
-          nsRect(firstTilePos.x, firstTilePos.y,
-                 aFill.XMost() - firstTilePos.x, aFill.YMost() - firstTilePos.y),
-          appUnitsPerDevPixel);
-      WrRect fill = aSc.ToRelativeWrRect(fillRect);
-      WrRect clip = aSc.ToRelativeWrRect(
-          LayoutDeviceRect::FromAppUnits(aFill, appUnitsPerDevPixel));
-
-      LayoutDeviceSize gapSize = LayoutDeviceSize::FromAppUnits(
-          aRepeatSize - aDest.Size(), appUnitsPerDevPixel);
-      aBuilder.PushImage(fill, aBuilder.PushClipRegion(clip),
-                         wr::ToWrSize(destRect.Size()), wr::ToWrSize(gapSize),
-                         wr::ImageRendering::Auto, key.value());
-      break;
-    }
-    default:
-      break;
-  }
-
-  return DrawResult::SUCCESS;
 }
 
 already_AddRefed<gfxDrawable>
@@ -717,6 +809,7 @@ nsImageRenderer::BuildWebRenderDisplayItemsForLayer(nsPresContext*       aPresCo
                                                     const mozilla::layers::StackingContextHelper& aSc,
                                                     nsTArray<WebRenderParentCommand>& aParentCommands,
                                                     WebRenderDisplayItemLayer*       aLayer,
+                                                    mozilla::layers::WebRenderLayerManager* aManager,
                                                     const nsRect&        aDest,
                                                     const nsRect&        aFill,
                                                     const nsPoint&       aAnchor,
@@ -732,8 +825,7 @@ nsImageRenderer::BuildWebRenderDisplayItemsForLayer(nsPresContext*       aPresCo
       mSize.width <= 0 || mSize.height <= 0) {
     return DrawResult::SUCCESS;
   }
-
-  return BuildWebRenderDisplayItems(aPresContext, aBuilder, aSc, aParentCommands, aLayer,
+  return BuildWebRenderDisplayItems(aPresContext, aBuilder, aSc, aParentCommands, aLayer, aManager,
                                     aDirty, aDest, aFill, aAnchor, aRepeatSize,
                                     CSSIntRect(0, 0,
                                                nsPresContext::AppUnitsToIntCSSPixels(mSize.width),

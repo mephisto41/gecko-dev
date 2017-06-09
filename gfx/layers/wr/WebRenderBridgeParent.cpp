@@ -261,6 +261,9 @@ WebRenderBridgeParent::RecvUpdateImage(const wr::ImageKey& aImageKey,
 mozilla::ipc::IPCResult
 WebRenderBridgeParent::RecvDeleteImage(const wr::ImageKey& aImageKey)
 {
+  PROFILER_LABEL("WebRenderBridgeParent", "RecvDeleteImage",
+    js::ProfileEntry::Category::GRAPHICS);
+
   if (mDestroyed) {
     return IPC_OK();
   }
@@ -413,6 +416,9 @@ WebRenderBridgeParent::RecvDPEnd(const gfx::IntSize& aSize,
                                  const WrBuiltDisplayListDescriptor& dlDesc,
                                  const WebRenderScrollData& aScrollData)
 {
+  PROFILER_LABEL("WebRenderBridgeParent", "RecvDPEnd",
+    js::ProfileEntry::Category::GRAPHICS);
+
   if (mDestroyed) {
     return IPC_OK();
   }
@@ -432,6 +438,9 @@ WebRenderBridgeParent::RecvDPSyncEnd(const gfx::IntSize &aSize,
                                      const WrBuiltDisplayListDescriptor& dlDesc,
                                      const WebRenderScrollData& aScrollData)
 {
+  PROFILER_LABEL("WebRenderBridgeParent", "RecvDPSyncEnd",
+    js::ProfileEntry::Category::GRAPHICS);
+
   if (mDestroyed) {
     return IPC_OK();
   }
@@ -446,6 +455,9 @@ WebRenderBridgeParent::ProcessWebRenderCommands(const gfx::IntSize &aSize,
                                                 const WrSize& aContentSize, const ByteBuffer& dl,
                                                 const WrBuiltDisplayListDescriptor& dlDesc)
 {
+  PROFILER_LABEL("WebRenderBridgeParent", "ProcessWebRenderCommands",
+    js::ProfileEntry::Category::GRAPHICS);
+
   mCompositableHolder->SetCompositionTime(TimeStamp::Now());
 
   for (InfallibleTArray<WebRenderParentCommand>::index_type i = 0; i < aCommands.Length(); ++i) {
@@ -836,6 +848,9 @@ WebRenderBridgeParent::SampleAnimations(nsTArray<WrOpacityProperty>& aOpacityArr
 void
 WebRenderBridgeParent::CompositeToTarget(gfx::DrawTarget* aTarget, const gfx::IntRect* aRect)
 {
+  PROFILER_LABEL("WebRenderBridgeParent", "CompositeToTarget",
+    js::ProfileEntry::Category::GRAPHICS);
+
   if (mPaused) {
     return;
   }
@@ -910,6 +925,8 @@ WebRenderBridgeParent::LastPendingTransactionId()
 uint64_t
 WebRenderBridgeParent::FlushPendingTransactionIds()
 {
+  PROFILER_LABEL("WebRenderBridgeParent", "FlushPendingTransactionIds",
+    js::ProfileEntry::Category::GRAPHICS);
   uint64_t id = 0;
   while (!mPendingTransactionIds.empty()) {
     id = mPendingTransactionIds.front().mId;
@@ -921,6 +938,9 @@ WebRenderBridgeParent::FlushPendingTransactionIds()
 uint64_t
 WebRenderBridgeParent::FlushTransactionIdsForEpoch(const wr::Epoch& aEpoch)
 {
+  PROFILER_LABEL("WebRenderBridgeParent", "FlushTransactionIdsForEpoch",
+    js::ProfileEntry::Category::GRAPHICS);
+
   uint64_t id = 0;
   while (!mPendingTransactionIds.empty()) {
     id = mPendingTransactionIds.front().mId;
@@ -951,6 +971,8 @@ WebRenderBridgeParent::DeleteOldImages()
 void
 WebRenderBridgeParent::ScheduleComposition()
 {
+  PROFILER_LABEL("WebRenderBridgeParent", "ScheduleComposition",
+    js::ProfileEntry::Category::GRAPHICS);
   if (mCompositorScheduler) {
     mCompositorScheduler->ScheduleComposition();
   }
@@ -959,6 +981,9 @@ WebRenderBridgeParent::ScheduleComposition()
 void
 WebRenderBridgeParent::FlushRendering(bool aIsSync)
 {
+  PROFILER_LABEL("WebRenderBridgeParent", "FlushRendering",
+    js::ProfileEntry::Category::GRAPHICS);
+
   if (mDestroyed) {
     return;
   }
@@ -1009,6 +1034,9 @@ WebRenderBridgeParent::Resume()
 void
 WebRenderBridgeParent::ClearResources()
 {
+  PROFILER_LABEL("WebRenderBridgeParent", "ClearResources",
+    js::ProfileEntry::Category::GRAPHICS);
+
   if (!mApi) {
     return;
   }
@@ -1065,6 +1093,8 @@ WebRenderBridgeParent::SendAsyncMessage(const InfallibleTArray<AsyncParentMessag
 void
 WebRenderBridgeParent::SendPendingAsyncMessages()
 {
+  PROFILER_LABEL("WebRenderBridgeParent", "SendPendingAsyncMessages",
+    js::ProfileEntry::Category::GRAPHICS);
   MOZ_ASSERT(mCompositorBridge);
   mCompositorBridge->SendPendingAsyncMessages();
 }
@@ -1072,6 +1102,8 @@ WebRenderBridgeParent::SendPendingAsyncMessages()
 void
 WebRenderBridgeParent::SetAboutToSendAsyncMessages()
 {
+  PROFILER_LABEL("WebRenderBridgeParent", "SetAboutToSendAsyncMessages",
+    js::ProfileEntry::Category::GRAPHICS);
   MOZ_ASSERT(mCompositorBridge);
   mCompositorBridge->SetAboutToSendAsyncMessages();
 }

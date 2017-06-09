@@ -99,6 +99,9 @@ WebRenderBridgeChild::DPEnd(wr::DisplayListBuilder &aBuilder,
                             uint64_t aTransactionId,
                             const WebRenderScrollData& aScrollData)
 {
+  PROFILER_LABEL("WebRenderBridgeChild", "DPEnd",
+    js::ProfileEntry::Category::GRAPHICS);
+
   MOZ_ASSERT(!mDestroyed);
   MOZ_ASSERT(mIsInTransaction);
 

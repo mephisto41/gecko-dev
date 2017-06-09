@@ -2066,7 +2066,7 @@ already_AddRefed<LayerManager> nsDisplayList::PaintRoot(nsDisplayListBuilder* aB
                                                         uint32_t aFlags) {
   PROFILER_LABEL("nsDisplayList", "PaintRoot",
     js::ProfileEntry::Category::GRAPHICS);
-
+  
   RefPtr<LayerManager> layerManager;
   bool widgetTransaction = false;
   bool doBeginTransaction = true;
@@ -2084,6 +2084,13 @@ already_AddRefed<LayerManager> nsDisplayList::PaintRoot(nsDisplayListBuilder* aB
       return nullptr;
     }
     layerManager = new BasicLayerManager(BasicLayerManager::BLM_OFFSCREEN);
+  }
+
+
+
+  if (layerManager->GetBackendType() == layers::LayersBackend::LAYERS_WR && XRE_IsContentProcess()) {
+    static_cast<WebRenderLayerManager*>(layerManager.get())->EndTransaction2(this, aBuilder);
+    return layerManager.forget();
   }
 
   nsIFrame* frame = aBuilder->RootReferenceFrame();
@@ -3510,6 +3517,32 @@ nsDisplayBackgroundImage::CanBuildWebRenderDisplayItems(LayerManager* aManager)
 }
 
 void
+nsDisplayBackgroundImage::CreateWebRenderCommands(mozilla::wr::DisplayListBuilder& aBuilder,
+                                                  const StackingContextHelper& aSc,
+                                                  nsTArray<WebRenderParentCommand>& aParentCommands,
+                                                  mozilla::layers::WebRenderDisplayItemLayer* aLayer,
+                                                  WebRenderLayerManager* aManager,
+                                                  nsDisplayListBuilder* aDisplayListBuilder)
+{
+  mImageFlags = aDisplayListBuilder->GetBackgroundPaintFlags();
+  CheckForBorderItem(this, mImageFlags);
+  if (!ShouldUseAdvancedLayer(aManager, gfxPrefs::LayersAllowBackgroundImage) ||
+      !CanBuildWebRenderDisplayItems(aManager)) {
+    //printf_stderr("@@@DEBUG: Drop a nsDisplayBackgroundImage!!!\n");
+    return;
+  }
+  nsCSSRendering::PaintBGParams params =
+    nsCSSRendering::PaintBGParams::ForSingleLayer(*StyleFrame()->PresContext(),
+                                                  mVisibleRect, mBackgroundRect,
+                                                  StyleFrame(), mImageFlags, mLayer,
+                                                  CompositionOp::OP_OVER);
+  params.bgClipRect = &mBounds;
+  DrawResult result =
+    nsCSSRendering::BuildWebRenderDisplayItemsForStyleImageLayer(params, aBuilder, aSc, aParentCommands, aLayer, aManager);
+  nsDisplayBackgroundGeometry::UpdateDrawResult(this, result);
+}
+
+void
 nsDisplayBackgroundImage::CreateWebRenderCommands(wr::DisplayListBuilder& aBuilder,
                                                   const StackingContextHelper& aSc,
                                                   nsTArray<WebRenderParentCommand>& aParentCommands,
@@ -3523,7 +3556,7 @@ nsDisplayBackgroundImage::CreateWebRenderCommands(wr::DisplayListBuilder& aBuild
   params.bgClipRect = &mBounds;
 
   DrawResult result =
-    nsCSSRendering::BuildWebRenderDisplayItemsForStyleImageLayer(params, aBuilder, aSc, aParentCommands, aLayer);
+    nsCSSRendering::BuildWebRenderDisplayItemsForStyleImageLayer(params, aBuilder, aSc, aParentCommands, aLayer, aLayer->WrManager());
 
   nsDisplayBackgroundGeometry::UpdateDrawResult(this, result);
 }
@@ -4122,6 +4155,27 @@ nsDisplayBackgroundColor::BuildLayer(nsDisplayListBuilder* aBuilder,
                                                       aContainerParameters.mOffset.y, 0));
 
   return layer.forget();
+}
+
+void
+nsDisplayBackgroundColor::CreateWebRenderCommands(mozilla::wr::DisplayListBuilder& aBuilder,
+                                                  const StackingContextHelper& aSc,
+                                                  nsTArray<WebRenderParentCommand>& aParentCommands,
+                                                  WebRenderDisplayItemLayer* aLayer)
+{
+  if (mColor == Color()) {
+    return;
+  }
+
+  LayoutDeviceRect bounds = LayoutDeviceRect::FromAppUnits(
+        mBackgroundRect, mFrame->PresContext()->AppUnitsPerDevPixel());
+
+  WrRect transformedRect = aSc.ToRelativeWrRect(bounds);
+
+
+  aBuilder.PushRect(transformedRect,
+                    aBuilder.PushClipRegion(transformedRect),
+                    wr::ToWrColor(ToDeviceColor(mColor)));
 }
 
 void

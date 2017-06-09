@@ -13,6 +13,7 @@
 #include "mozilla/webrender/WebRenderTypes.h"
 
 class nsIWidget;
+class nsDisplayList;
 
 namespace mozilla {
 namespace layers {
@@ -45,6 +46,7 @@ public:
   virtual bool BeginTransactionWithTarget(gfxContext* aTarget) override;
   virtual bool BeginTransaction() override;
   virtual bool EndEmptyTransaction(EndTransactionFlags aFlags = END_DEFAULT) override;
+  void EndTransaction2(nsDisplayList* aDisplayList, nsDisplayListBuilder* aBuilder);
   virtual void EndTransaction(DrawPaintedLayerCallback aCallback,
                               void* aCallbackData,
                               EndTransactionFlags aFlags = END_DEFAULT) override;
