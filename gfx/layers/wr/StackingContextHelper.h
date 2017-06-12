@@ -24,6 +24,15 @@ class WebRenderLayer;
 class MOZ_RAII StackingContextHelper
 {
 public:
+  StackingContextHelper(const StackingContextHelper& aParentSC,
+                        wr::DisplayListBuilder& aBuilder,
+                        LayerRect aBoundForSC,
+                        LayerPoint aOrigin,
+                        uint64_t aAnimationsId,
+                        float* aOpacityPtr,
+                        gfx::Matrix4x4* aTransformPtr,
+                        const nsTArray<WrFilterOp>& aFilters = nsTArray<WrFilterOp>());
+
   // Pushes a stacking context onto the provided DisplayListBuilder. It uses
   // the transform if provided, otherwise takes the transform from the layer.
   // It also takes the mix-blend-mode and bounds from the layer, and uses 1.0

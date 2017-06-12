@@ -2088,6 +2088,7 @@ already_AddRefed<LayerManager> nsDisplayList::PaintRoot(nsDisplayListBuilder* aB
 
 
 
+  //if (layerManager->GetBackendType() == layers::LayersBackend::LAYERS_WR && XRE_IsContentProcess()) {
   if (layerManager->GetBackendType() == layers::LayersBackend::LAYERS_WR && XRE_IsContentProcess()) {
     static_cast<WebRenderLayerManager*>(layerManager.get())->EndTransaction2(this, aBuilder);
     return layerManager.forget();
@@ -4893,6 +4894,136 @@ nsDisplayBorder::BuildLayer(nsDisplayListBuilder* aBuilder,
 }
 
 void
+nsDisplayBorder::CreateWebRenderCommands(mozilla::wr::DisplayListBuilder& aBuilder,
+                                         const StackingContextHelper& aSc,
+                                         nsTArray<WebRenderParentCommand>& aParentCommands,
+                                         mozilla::layers::WebRenderDisplayItemLayer* aLayer,
+                                         mozilla::layers::WebRenderLayerManager* aManager,
+                                         nsDisplayListBuilder* aDisplayListBuilder)
+{
+  if (!ShouldUseAdvancedLayer(aManager, gfxPrefs::LayersAllowBorderLayers)) {
+    //printf_stderr("@@@DEBUG: Drop a nsDisplayBorder!!!\n");
+    return;
+  }
+
+  nsPoint offset = ToReferenceFrame();
+  Maybe<nsCSSBorderRenderer> br =
+    nsCSSRendering::CreateBorderRenderer(mFrame->PresContext(),
+                                         nullptr,
+                                         mFrame,
+                                         nsRect(),
+                                         nsRect(offset, mFrame->GetSize()),
+                                         mFrame->StyleContext(),
+                                         mFrame->GetSkipSides());
+
+  const nsStyleBorder *styleBorder = mFrame->StyleContext()->StyleBorder();
+  const nsStyleImage* image = &styleBorder->mBorderImageSource;
+  mBorderRenderer = Nothing();
+  mBorderImageRenderer = Nothing();
+  if ((!image ||
+       image->GetType() != eStyleImageType_Image ||
+       image->GetType() != eStyleImageType_Gradient) && !br) {
+    //printf_stderr("@@@DEBUG: Drop a nsDisplayBorder!!!\n");
+    return;
+  }
+
+  LayersBackend backend = aManager->GetBackendType();
+  if (backend == layers::LayersBackend::LAYERS_WR) {
+    if (br) {
+      if (!br->CanCreateWebRenderCommands()) {
+        //printf_stderr("@@@DEBUG: Drop a nsDisplayBorder!!!\n");
+        return;
+      }
+      mBorderRenderer = br;
+    } else {
+        printf_stderr("@@@Doesn't support image border!!!\n");
+        return;
+
+      if (styleBorder->mBorderImageRepeatH == NS_STYLE_BORDER_IMAGE_REPEAT_ROUND ||
+          styleBorder->mBorderImageRepeatH == NS_STYLE_BORDER_IMAGE_REPEAT_SPACE ||
+          styleBorder->mBorderImageRepeatV == NS_STYLE_BORDER_IMAGE_REPEAT_ROUND ||
+          styleBorder->mBorderImageRepeatV == NS_STYLE_BORDER_IMAGE_REPEAT_SPACE) {
+        // WebRender not supports this currently
+        //printf_stderr("@@@DEBUG: Drop a nsDisplayBorder!!!\n");
+        return;
+      }
+
+      uint32_t flags = 0;
+      if (aDisplayListBuilder->ShouldSyncDecodeImages()) {
+        flags |= nsImageRenderer::FLAG_SYNC_DECODE_IMAGES;
+      }
+
+      image::DrawResult result;
+      mBorderImageRenderer =
+        nsCSSBorderImageRenderer::CreateBorderImageRenderer(mFrame->PresContext(),
+                                                            mFrame,
+                                                            nsRect(offset, mFrame->GetSize()),
+                                                            *(mFrame->StyleContext()->StyleBorder()),
+                                                            mVisibleRect,
+                                                            mFrame->GetSkipSides(),
+                                                            flags,
+                                                            &result);
+
+      if (!mBorderImageRenderer) {
+        //printf_stderr("@@@DEBUG: Drop a nsDisplayBorder!!!\n");
+        return;
+      }
+
+      if (!mBorderImageRenderer->mImageRenderer.IsImageContainerAvailable(aManager, flags)) {
+        //printf_stderr("@@@DEBUG: Drop a nsDisplayBorder!!!\n");
+        return;
+      }
+    }
+
+    //printf_stderr("@@@DEBUG: Drop a nsDisplayBorder!!!\n");
+    return;
+  }
+
+  if (!br) {
+    //printf_stderr("@@@DEBUG: Drop a nsDisplayBorder!!!\n");
+    return;
+  }
+
+  bool hasCompositeColors;
+  if (!br->AllBordersSolid(&hasCompositeColors) || hasCompositeColors) {
+    //printf_stderr("@@@DEBUG: Drop a nsDisplayBorder!!!\n");
+    return;
+  }
+
+  // We don't support this yet as we don't copy the values to
+  // the layer, and BasicBorderLayer doesn't support it yet.
+  if (!br->mNoBorderRadius) {
+    //printf_stderr("@@@DEBUG: Drop a nsDisplayBorder!!!\n");
+    return;
+  }
+
+  // We copy these values correctly to the layer, but BasicBorderLayer
+  // won't render them
+  if (!br->AreBorderSideFinalStylesSame(eSideBitsAll) ||
+      !br->AllBordersSameWidth()) {
+    //printf_stderr("@@@DEBUG: Drop a nsDisplayBorder!!!\n");
+    return;
+  }
+
+  NS_FOR_CSS_SIDES(i) {
+    if (br->mBorderStyles[i] == NS_STYLE_BORDER_STYLE_SOLID) {
+      mColors[i] = ToDeviceColor(br->mBorderColors[i]);
+      mWidths[i] = br->mBorderWidths[i];
+      mBorderStyles[i] = br->mBorderStyles[i];
+    } else {
+      mWidths[i] = 0;
+    }
+  }
+  NS_FOR_CSS_FULL_CORNERS(corner) {
+    mCorners[corner] = LayerSize(br->mBorderRadii[corner].width, br->mBorderRadii[corner].height);
+  }
+
+  mRect = ViewAs<LayerPixel>(br->mOuterRect);
+  
+  CreateWebRenderCommands(aBuilder, aSc, aParentCommands, nullptr);
+};
+
+void
 nsDisplayBorder::CreateBorderImageWebRenderCommands(mozilla::wr::DisplayListBuilder& aBuilder,
                                                     const StackingContextHelper& aSc,
                                                     nsTArray<WebRenderParentCommand>& aParentCommands,
@@ -7537,6 +7668,119 @@ nsDisplayTransform::ShouldBuildLayerEvenIfInvisible(nsDisplayListBuilder* aBuild
   // result.  It should always build a layer to make sure it is
   // rendering correctly.
   return MayBeAnimated(aBuilder) || mFrame->Combines3DTransformWithAncestors();
+}
+
+void
+nsDisplayTransform::CreateWebRenderCommands(mozilla::wr::DisplayListBuilder& aBuilder,
+                                            const StackingContextHelper& aSc,
+                                            nsTArray<WebRenderParentCommand>& aParentCommands,
+                                            mozilla::layers::WebRenderDisplayItemLayer* aLayer,
+                                            WebRenderLayerManager* aManager,
+                                            nsDisplayListBuilder* aDisplayListBuilder)
+{
+  Matrix4x4 newTransformMatrix = GetTransformForRendering();
+  gfx::Matrix4x4* transformForSC = &newTransformMatrix;
+  if (transformForSC && newTransformMatrix.IsIdentity()) {
+    // If the transform is an identity transform, strip it out so that WR
+    // doesn't turn this stacking context into a reference frame, as it
+    // affects positioning. Bug 1345577 tracks a better fix.
+    transformForSC = nullptr;
+  }
+
+  //ContainerLayerParameters scaleParameters;
+  nsRect itemBounds = mStoredList.GetChildren()->GetClippedBoundsWithRespectToASR(aDisplayListBuilder, mActiveScrolledRoot);
+  nsRect childrenVisible = GetVisibleRectForChildren();
+  nsRect visibleRect = itemBounds.Intersect(childrenVisible);
+  float appUnitsPerDevPixel = mFrame->PresContext()->AppUnitsPerDevPixel();
+  LayerRect bounds = LayerRect::FromUnknownRect(
+                      LayoutDeviceRect::FromAppUnits(visibleRect, appUnitsPerDevPixel).ToUnknownRect());
+  LayerPoint origin = bounds.TopLeft();
+
+  gfx::Matrix4x4Typed<LayerPixel, LayerPixel> boundTransform = ViewAs< gfx::Matrix4x4Typed<LayerPixel, LayerPixel> >(newTransformMatrix);
+  boundTransform._41 = 0.0f;
+  boundTransform._42 = 0.0f;
+  boundTransform._43 = 0.0f;
+  if (!boundTransform.IsIdentity()) {
+    // WR will only apply the 'translate' of the transform, so we need to do the scale/rotation manually.
+    bounds.MoveTo(boundTransform.TransformPoint(bounds.TopLeft()));
+  }
+
+  nsTArray<WrFilterOp> filters;
+  StackingContextHelper sc(aSc,
+                           aBuilder,
+                           bounds,
+                           origin,
+                           0,
+                           nullptr,
+                           transformForSC,
+                           filters);
+
+  nsDisplayList* displayList = mStoredList.GetChildren();
+  nsDisplayList savedItems;
+  nsDisplayItem* item;
+  while ((item = displayList->RemoveBottom()) != nullptr) {
+    nsDisplayItem::Type itemType = item->GetType();
+
+    // If the item is a event regions item, but is empty (has no regions in it)
+    // then we should just throw it out
+    if (itemType == nsDisplayItem::TYPE_LAYER_EVENT_REGIONS) {
+      nsDisplayLayerEventRegions* eventRegions =
+        static_cast<nsDisplayLayerEventRegions*>(item);
+      if (eventRegions->IsEmpty()) {
+        item->~nsDisplayItem();
+        continue;
+      }
+    }
+
+    // Peek ahead to the next item and try merging with it or swapping with it
+    // if necessary.
+    nsDisplayItem* aboveItem;
+    while ((aboveItem = displayList->GetBottom()) != nullptr) {
+      if (aboveItem->TryMerge(item)) {
+        displayList->RemoveBottom();
+        item->~nsDisplayItem();
+        item = aboveItem;
+        itemType = item->GetType();
+      } else {
+        break;
+      }
+    }
+
+    nsDisplayList* itemSameCoordinateSystemChildren
+      = item->GetSameCoordinateSystemChildren();
+    if (item->ShouldFlattenAway(aDisplayListBuilder)) {
+      displayList->AppendToBottom(itemSameCoordinateSystemChildren);
+      item->~nsDisplayItem();
+      continue;
+    }
+
+    savedItems.AppendToTop(item);
+
+
+    //nsTArray<WebRenderParentCommand> parentCommands;
+
+    switch (itemType) {
+    case nsDisplayItem::TYPE_BACKGROUND_COLOR:
+    case nsDisplayItem::TYPE_CANVAS_BACKGROUND_COLOR:
+      item->CreateWebRenderCommands(aBuilder, sc, aParentCommands, nullptr);
+      break;
+    case nsDisplayItem::TYPE_TEXT:
+    case nsDisplayItem::TYPE_BORDER:
+    case nsDisplayItem::TYPE_BACKGROUND:
+    case nsDisplayItem::TYPE_IMAGE:
+    case nsDisplayItem::TYPE_TRANSFORM:
+      //printf_stderr("@@@Handling2: %s\n", item->Name());
+      item->CreateWebRenderCommands(aBuilder, sc, aParentCommands, nullptr, aManager, aDisplayListBuilder);
+      //printf_stderr("@@@Finished2: %s\n", item->Name());
+      break;
+    default:
+      //printf_stderr("@@@DEBUG: Drop display item2: %s\n", item->Name());
+      break;
+    }
+
+    aManager->WrBridge()->AddWebRenderParentCommands(aParentCommands);
+  }
+  displayList->AppendToTop(&savedItems);
 }
 
 already_AddRefed<Layer> nsDisplayTransform::BuildLayer(nsDisplayListBuilder *aBuilder,

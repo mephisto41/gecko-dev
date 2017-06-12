@@ -69,6 +69,10 @@
 #include "mozilla/StyleSetHandle.h"
 #include "mozilla/StyleSetHandleInlines.h"
 #include "mozilla/layers/LayersMessages.h"
+#include "mozilla/layers/WebRenderLayerManager.h"
+#include "mozilla/layers/WebRenderBridgeChild.h"
+#include "mozilla/webrender/WebRenderAPI.h"
+#include "mozilla/layers/StackingContextHelper.h"
 
 #include <algorithm>
 #include <limits>
@@ -4894,6 +4898,12 @@ public:
   virtual already_AddRefed<Layer> BuildLayer(nsDisplayListBuilder* aBuilder,
                                              LayerManager* aManager,
                                              const ContainerLayerParameters& aContainerParameters) override;
+  void CreateWebRenderCommands(mozilla::wr::DisplayListBuilder& aBuilder,
+                               const StackingContextHelper& aSc,
+                               nsTArray<WebRenderParentCommand>& aParentCommands,
+                               mozilla::layers::WebRenderDisplayItemLayer* aLayer,
+                               WebRenderLayerManager* aManager,
+                               nsDisplayListBuilder* aDisplayListBuilder);
   virtual void Paint(nsDisplayListBuilder* aBuilder,
                      nsRenderingContext* aCtx) override;
   NS_DISPLAY_DECL_NAME("Text", TYPE_TEXT)
@@ -5136,6 +5146,34 @@ nsDisplayText::Paint(nsDisplayListBuilder* aBuilder,
   DrawTargetAutoDisableSubpixelAntialiasing disable(aCtx->GetDrawTarget(),
                                                     mDisableSubpixelAA);
   RenderToContext(aCtx->ThebesContext(), aBuilder);
+}
+
+void
+nsDisplayText::CreateWebRenderCommands(mozilla::wr::DisplayListBuilder& aBuilder,
+                                       const StackingContextHelper& aSc,
+                                       nsTArray<WebRenderParentCommand>& aParentCommands,
+                                       mozilla::layers::WebRenderDisplayItemLayer* aLayer,
+                                       WebRenderLayerManager* aManager,
+                                       nsDisplayListBuilder* aDisplayListBuilder)
+{
+  if (!mFont || mBounds.IsEmpty()) {
+      //printf_stderr("@@@DEBUG: Drop a nsDisplayBackgroundImage!!!\n");
+      return;
+  }
+
+  //ScrollingLayersHelper scroller(this, aBuilder, aSc);
+
+  auto appUnitsPerDevPixel = mFrame->PresContext()->AppUnitsPerDevPixel();
+  LayoutDeviceRect rect = LayoutDeviceRect::FromAppUnits(
+      mBounds, appUnitsPerDevPixel);
+  LayoutDeviceRect clipRect = rect;
+  if (GetClip().HasClip()) {
+    clipRect = LayoutDeviceRect::FromAppUnits(
+                GetClip().GetClipRect(), appUnitsPerDevPixel);
+  }
+  aManager->WrBridge()->PushGlyphs(aBuilder, mGlyphs, mFont, aSc,
+                                   LayerRect::FromUnknownRect(rect.ToUnknownRect()),
+                                   LayerRect::FromUnknownRect(clipRect.ToUnknownRect()));
 }
 
 already_AddRefed<layers::Layer>

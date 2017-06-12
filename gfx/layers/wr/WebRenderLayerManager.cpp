@@ -168,6 +168,10 @@ PopulateScrollData(WebRenderScrollData& aTarget, Layer* aLayer)
 void
 WebRenderLayerManager::EndTransaction2(nsDisplayList* aDisplayList, nsDisplayListBuilder* aBuilder)
 {
+  if (!mTransactionIdAllocator) {
+    return;
+  }
+
   DiscardImages();
   WrBridge()->RemoveExpiredFontKeys();
 
@@ -224,13 +228,17 @@ WebRenderLayerManager::EndTransaction2(nsDisplayList* aDisplayList, nsDisplayLis
 
     switch (itemType) {
     case nsDisplayItem::TYPE_BACKGROUND_COLOR:
-    case nsDisplayItem::TYPE_TEXT:
     case nsDisplayItem::TYPE_CANVAS_BACKGROUND_COLOR:
       item->CreateWebRenderCommands(builder, sc, parentCommands, nullptr);
       break;
+    case nsDisplayItem::TYPE_TEXT:
+    case nsDisplayItem::TYPE_BORDER:
     case nsDisplayItem::TYPE_BACKGROUND:
     case nsDisplayItem::TYPE_IMAGE:
+    case nsDisplayItem::TYPE_TRANSFORM:
+      //printf_stderr("@@@Handling: %s\n", item->Name());
       item->CreateWebRenderCommands(builder, sc, parentCommands, nullptr, this, aBuilder);
+      //printf_stderr("@@@Finished: %s\n", item->Name());
       break;
     default:
       //printf_stderr("@@@DEBUG: Drop display item: %s\n", item->Name());

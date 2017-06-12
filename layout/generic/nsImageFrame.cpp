@@ -1876,21 +1876,11 @@ nsDisplayImage::CreateWebRenderCommands(mozilla::wr::DisplayListBuilder& aBuilde
                 GetClip().GetClipRect(), appUnitsPerDevPixel);
   }
 
-  //LayerRect clipRect = ClipRect().valueOr(rect);
-  //Maybe<WrImageMask> mask = BuildWrMaskLayer(&sc);
   WrClipRegionToken clip = aBuilder.PushClipRegion(
       sc.ToRelativeWrRect(clipRect),
       nullptr);
 
-  //wr::ImageRendering filter = wr::ToImageRendering(mSamplingFilter);
   wr::ImageRendering filter = wr::ToImageRendering(gfx::SamplingFilter::GOOD);
-
-  //DumpLayerInfo("Image Layer", rect);
-  //if (gfxPrefs::LayersDump()) {
-  //  printf_stderr("ImageLayer %p texture-filter=%s \n",
-  //                GetLayer(),
-  //                Stringify(filter).c_str());
-  //}
   aBuilder.PushImage(sc.ToRelativeWrRect(rect), clip, filter, mKey.value());
 }
 
