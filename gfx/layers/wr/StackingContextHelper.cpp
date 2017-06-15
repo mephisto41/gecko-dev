@@ -28,6 +28,11 @@ StackingContextHelper::StackingContextHelper(const StackingContextHelper& aParen
   Layer* layer = aLayer->GetLayer();
   mTransform = aTransform.valueOr(layer->GetTransform());
 
+  if (!mTransform.IsIdentity()) {
+    std::stringstream ss;
+    ss << mTransform;
+    printf_stderr("Morris transform %s\n", ss.str().c_str());
+  }
   float opacity = 1.0f;
   mBuilder->PushStackingContext(scBounds, 0, &opacity,
                                 mTransform.IsIdentity() ? nullptr : &mTransform,

@@ -470,11 +470,11 @@ WebRenderBridgeParent::ProcessWebRenderCommands(const gfx::IntSize &aSize,
           NS_ERROR("TextureHost does not exist");
           break;
         }
-        WebRenderTextureHost* wrTexture = texture->AsWebRenderTextureHost();
-        if (wrTexture) {
-          wrTexture->AddWRImage(mApi, keys, wrTexture->GetExternalImageKey());
-          break;
-        }
+        /* WebRenderTextureHost* wrTexture = texture->AsWebRenderTextureHost(); */
+        /* if (wrTexture) { */
+        /*   wrTexture->AddWRImage(mApi, keys, wrTexture->GetExternalImageKey()); */
+        /*   break; */
+        /* } */
         RefPtr<DataSourceSurface> dSurf = host->GetAsSurface();
         if (!dSurf) {
           NS_ERROR("TextureHost does not return DataSourceSurface");

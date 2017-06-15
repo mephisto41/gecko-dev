@@ -20,7 +20,7 @@ extern crate webrender_traits;
 // Note: wrench will panic if external images are used, they can
 // be disabled in WebRenderBridgeParent::ProcessWebRenderCommands
 // by commenting out the path that adds an external image ID
-static ENABLE_RECORDING: bool = false;
+static ENABLE_RECORDING: bool = true;
 
 type WrAPI = RenderApi;
 type WrBorderStyle = BorderStyle;
