@@ -1219,6 +1219,7 @@ pub extern "C" fn wr_dp_begin(state: &mut WrState,
                               width: u32,
                               height: u32) {
     assert!(unsafe { !is_in_render_thread() });
+    println!("Morris dp_begin");
     state.frame_builder.dl_builder.data.clear();
 
     let bounds = LayoutRect::new(LayoutPoint::new(0.0, 0.0),
@@ -1238,6 +1239,7 @@ pub extern "C" fn wr_dp_begin(state: &mut WrState,
 #[no_mangle]
 pub extern "C" fn wr_dp_end(state: &mut WrState) {
     assert!(unsafe { !is_in_render_thread() });
+    println!("Morris dp_end");
     state.frame_builder.dl_builder.pop_stacking_context();
 }
 

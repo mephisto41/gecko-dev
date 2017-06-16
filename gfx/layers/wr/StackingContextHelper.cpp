@@ -32,6 +32,7 @@ StackingContextHelper::StackingContextHelper(const StackingContextHelper& aParen
     std::stringstream ss;
     ss << mTransform;
     printf_stderr("Morris transform %s\n", ss.str().c_str());
+    printf_stderr("Morris bound %f, %f, %f, %f\n", scBounds.x, scBounds.y, scBounds.width, scBounds.height);
   }
   float opacity = 1.0f;
   mBuilder->PushStackingContext(scBounds, 0, &opacity,

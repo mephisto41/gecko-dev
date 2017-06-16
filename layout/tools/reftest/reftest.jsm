@@ -1467,6 +1467,12 @@ function StartCurrentURI(aState)
         if (TYPE_SCRIPT == type) {
             SendLoadScriptTest(gCurrentURL, gLoadTimeout);
         } else {
+            SendClear();
+            SendClear();
+            SendClear();
+            SendClear();
+            SendClear();
+            SendClear();
             SendLoadTest(type, gCurrentURL, gLoadTimeout);
         }
     }

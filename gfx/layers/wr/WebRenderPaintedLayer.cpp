@@ -100,9 +100,6 @@ WebRenderPaintedLayer::CreateWebRenderDisplayList(wr::DisplayListBuilder& aBuild
   DumpLayerInfo("PaintedLayer", rect);
 
   LayerRect clipRect = ClipRect().valueOr(rect);
-  std::stringstream ss;
-  ss << rect;
-  printf_stderr("Morris rect %s\n", ss.str().c_str());
   Maybe<WrImageMask> mask = BuildWrMaskLayer(&sc);
   WrClipRegionToken clip = aBuilder.PushClipRegion(
       sc.ToRelativeWrRect(clipRect),

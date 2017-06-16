@@ -234,6 +234,9 @@ WebRenderImageLayer::RenderLayer(wr::DisplayListBuilder& aBuilder,
                   GetLayer(),
                   Stringify(filter).c_str());
   }
+  std::stringstream ss;
+  ss << rect;
+  printf_stderr("Morris rect: %s\n", ss.str().c_str());
   aBuilder.PushImage(sc.ToRelativeWrRect(rect), clip, filter, mKey.value());
 }
 

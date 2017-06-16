@@ -74,6 +74,7 @@ WebRenderBridgeChild::DPBegin(const gfx::IntSize& aSize)
   mIsInTransaction = true;
   mReadLockSequenceNumber = 0;
   mReadLocks.AppendElement();
+  printf_stderr("Morris DPBegin\n");
   return true;
 }
 
@@ -118,6 +119,7 @@ WebRenderBridgeChild::DPEnd(wr::DisplayListBuilder &aBuilder,
   mParentCommands.Clear();
   mDestroyedActors.Clear();
   mIsInTransaction = false;
+  printf_stderr("Morris DPend\n");
 }
 
 void
