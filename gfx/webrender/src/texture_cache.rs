@@ -621,7 +621,8 @@ impl TextureCache {
         //           texture. This isn't ideal, as it causes lots of batch breaks,
         //           but is probably rare enough that it can be fixed up later (it's also
         //           fairly trivial to implement, just tedious).
-        if filter == TextureFilter::Nearest {
+        // if filter == TextureFilter::Nearest {
+        if true {
             // Fall back to standalone texture allocation.
             let texture_id = self.cache_id_list.allocate();
             let cache_item = TextureCacheItem::new(
