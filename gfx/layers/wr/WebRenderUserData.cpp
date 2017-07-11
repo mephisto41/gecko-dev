@@ -5,6 +5,7 @@
 
 #include "WebRenderUserData.h"
 #include "nsDisplayListInvalidation.h"
+#include "WebRenderCanvasRenderer.h"
 
 namespace mozilla {
 namespace layers {
@@ -167,6 +168,25 @@ void
 WebRenderFallbackData::SetGeometry(nsAutoPtr<nsDisplayItemGeometry> aGeometry)
 {
   mGeometry = aGeometry;
+}
+
+WebRenderCanvasData::WebRenderCanvasData(WebRenderLayerManager* aWRManager)
+  : WebRenderUserData(aWRManager)
+{
+}
+
+WebRenderCanvasData::~WebRenderCanvasData()
+{
+}
+
+WebRenderCanvasRendererAsync*
+WebRenderCanvasData::GetCanvasRenderer()
+{
+  if (!mCanvasRenderer) {
+    mCanvasRenderer = MakeUnique<WebRenderCanvasRendererAsync>(mWRManager);
+  }
+
+  return mCanvasRenderer.get();
 }
 
 } // namespace layers
