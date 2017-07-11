@@ -36,7 +36,7 @@ WebRenderImageData::~WebRenderImageData()
   }
 
   if (mPipelineId) {
-    WrBridge()->RemovePipelineIdForAsyncCompositable(mPipelineId.ref());
+    WrBridge()->RemovePipelineIdForCompositable(mPipelineId.ref());
   }
 }
 
