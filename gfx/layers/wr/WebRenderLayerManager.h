@@ -193,6 +193,9 @@ public:
 
     MOZ_ASSERT(data);
     MOZ_ASSERT(data->GetType() == T::Type());
+    if (T::Type() == WebRenderUserData::UserDataType::eCanvas) {
+      mLastCanvasDatas.PutEntry(data->AsCanvasData());
+    }
     RefPtr<T> res = static_cast<T*>(data.get());
     return res.forget();
   }
@@ -262,6 +265,10 @@ private:
   uint32_t mPaintSequenceNumber;
   // See equivalent field in ClientLayerManager
   APZTestData mApzTestData;
+
+  typedef nsTHashtable<nsRefPtrHashKey<WebRenderCanvasData>> CanvasDataSet;
+  // Store of WebRenderCanvasData objects for use in empty transactions
+  CanvasDataSet mLastCanvasDatas;
 };
 
 } // namespace layers
