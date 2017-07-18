@@ -8,6 +8,7 @@
 
 #include "mozilla/layers/StackingContextHelper.h"
 #include "mozilla/webrender/WebRenderAPI.h"
+#include "nsAutoPtr.h"
 
 class nsDisplayItemGeometry;
 
