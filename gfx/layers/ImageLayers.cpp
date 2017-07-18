@@ -6,6 +6,7 @@
 #include "ImageLayers.h"
 #include "ImageContainer.h"             // for ImageContainer
 #include "gfxRect.h"                    // for gfxRect
+#include "mozilla/gfx/Point.h"
 #include "nsDebug.h"                    // for NS_ASSERTION
 #include "nsISupportsImpl.h"            // for ImageContainer::Release, etc
 #include "gfx2DGlue.h"
