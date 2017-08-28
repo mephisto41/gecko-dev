@@ -2056,6 +2056,7 @@ nsDisplayList::GetClippedBoundsWithRespectToASR(nsDisplayListBuilder* aBuilder,
                                                 const ActiveScrolledRoot* aASR,
                                                 nsRect* aVisibleRect) const {
   nsRect bounds;
+  std::stringstream ss;
   for (nsDisplayItem* i = GetBottom(); i != nullptr; i = i->GetAbove()) {
     nsRect r = i->GetClippedBounds(aBuilder);
     if (aASR != i->GetActiveScrolledRoot() && !r.IsEmpty()) {
@@ -2073,7 +2074,13 @@ nsDisplayList::GetClippedBoundsWithRespectToASR(nsDisplayListBuilder* aBuilder,
     if (aVisibleRect) {
       aVisibleRect->UnionRect(*aVisibleRect, i->GetVisibleRect());
     }
+    ss << i << " "  << bounds << " ";
     bounds.UnionRect(bounds, r);
+    ss << bounds << " " << r << " ";
+  }
+  printf_stderr("Morris end this:%p %s\n", this, ss.str().c_str());
+  if (bounds.x == 0 && bounds.y == 0 && bounds.width == 2400 && bounds.height == 1200) {
+    int i = 5;
   }
   return bounds;
 }
@@ -8325,12 +8332,16 @@ nsDisplayTransform::GetBounds(nsDisplayListBuilder* aBuilder,
     return nsRect();
   }
 
+  printf_stderr("Morris getbound start\n");
   nsRect untransformedBounds = mStoredList.GetBounds(aBuilder, aSnap);
   // GetTransform always operates in dev pixels.
   float factor = mFrame->PresContext()->AppUnitsPerDevPixel();
   mBounds = nsLayoutUtils::MatrixTransformRect(untransformedBounds,
                                                GetTransform(),
                                                factor);
+  std::stringstream ss;
+  ss << mBounds;
+  printf_stderr("Morris getbound end this:%p, %s\n", this, ss.str().c_str());
   mHasBounds = true;
   return mBounds;
 }

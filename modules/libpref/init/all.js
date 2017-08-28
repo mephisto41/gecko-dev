@@ -3044,7 +3044,7 @@ pref("layout.frame_rate", -1);
 
 // pref to dump the display list to the log. Useful for debugging drawing.
 pref("layout.display-list.dump", false);
-pref("layout.display-list.dump-content", false);
+pref("layout.display-list.dump-content", true);
 
 // Toggle retaining display lists between paints
 #ifdef ANDROID

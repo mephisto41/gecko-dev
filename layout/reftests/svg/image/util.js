@@ -4,13 +4,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 // The possible values of the "align" component of preserveAspectRatio.
-const ALIGN_VALS = ["none",
-                    "xMinYMin", "xMinYMid", "xMinYMax",
+const ALIGN_VALS = ["xMinYMax",
+                    "xMinYMin", "xMinYMax", "xMinYMax",
                     "xMidYMin", "xMidYMid", "xMidYMax",
                     "xMaxYMin", "xMaxYMid", "xMaxYMax"];
 
 // The possible values of the "meetOrSlice" component of preserveAspectRatio.
-const MEETORSLICE_VALS = [ "meet", "slice" ];
+const MEETORSLICE_VALS = [ "slice", "slice" ];
 
 const SVGNS   = "http://www.w3.org/2000/svg";
 const XLINKNS = "http://www.w3.org/1999/xlink";
@@ -130,7 +130,7 @@ function generateSymbolGrid(aHref, aWidth, aHeight, aBonusPARVal) {
   var grid = document.createElementNS(SVGNS, "g");
   var y = 0;
   var x = 0;
-  for (var i = 0; i < ALIGN_VALS.length; i++) {
+  for (var i = 0; i < ALIGN_VALS.length - 9; i++) {
     // Jump to next line of grid, for every other "i" value.
     // (every fourth entry)
     if (i && i % 2 == 0) {
@@ -138,7 +138,7 @@ function generateSymbolGrid(aHref, aWidth, aHeight, aBonusPARVal) {
       x = 0;
     }
     var alignVal = ALIGN_VALS[i];
-    for (var j = 0; j < MEETORSLICE_VALS.length; j++) {
+    for (var j = 0; j < MEETORSLICE_VALS.length - 1; j++) {
       var meetorsliceVal = MEETORSLICE_VALS[j];
       var border = generateBorderRect(x, y, aWidth, aHeight);
 
@@ -154,20 +154,20 @@ function generateSymbolGrid(aHref, aWidth, aHeight, aBonusPARVal) {
     }
   }
 
-  if (aBonusPARVal) {
-    // Add one final entry with "bonus" pAR value.
-    y += IMAGE_OFFSET;
-    x = 0;
-    var border = generateBorderRect(x, y, aWidth, aHeight);
-    var symbolID = "symbol_Bonus";
-    var symbol = generateSymbolElementForParams(symbolID, aHref,
-                                                aBonusPARVal, "");
-    var use = generateUseElementForParams("#" + symbolID,
-                                          x, y, aWidth, aHeight);
-    grid.appendChild(symbol); // This isn't painted
-    grid.appendChild(border);
-    grid.appendChild(use);
-  }
+  // if (aBonusPARVal) {
+  //   // Add one final entry with "bonus" pAR value.
+  //   y += IMAGE_OFFSET;
+  //   x = 0;
+  //   var border = generateBorderRect(x, y, aWidth, aHeight);
+  //   var symbolID = "symbol_Bonus";
+  //   var symbol = generateSymbolElementForParams(symbolID, aHref,
+  //                                               aBonusPARVal, "");
+  //   var use = generateUseElementForParams("#" + symbolID,
+  //                                         x, y, aWidth, aHeight);
+  //   grid.appendChild(symbol); // This isn't painted
+  //   grid.appendChild(border);
+  //   grid.appendChild(use);
+  // }
 
   return grid;
 }

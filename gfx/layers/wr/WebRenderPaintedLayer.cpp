@@ -98,6 +98,9 @@ WebRenderPaintedLayer::CreateWebRenderDisplayList(wr::DisplayListBuilder& aBuild
 
   LayerRect rect = Bounds();
   DumpLayerInfo("PaintedLayer", rect);
+  std::stringstream ss;
+  ss << rect;
+  /* printf_stderr("Morris rect %s\n", ss.str().c_str()); */
 
   wr::WrImageKey key = GenerateImageKey();
   WrBridge()->AddWebRenderParentCommand(OpAddExternalImage(mExternalImageId.value(), key));
