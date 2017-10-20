@@ -2038,8 +2038,9 @@ impl FrameBuilder {
                         match *filter {
                             FilterOp::Blur(blur_radius) => {
                                 let blur_radius = device_length(blur_radius, device_pixel_ratio);
+                                let inflate_size = blur_radius.0 * 3;
                                 render_tasks.get_mut(current_task_id)
-                                            .inflate(blur_radius.0);
+                                            .inflate(inflate_size);
                                 let blur_render_task = RenderTask::new_blur(
                                     blur_radius,
                                     current_task_id,
@@ -2052,8 +2053,8 @@ impl FrameBuilder {
                                     blur_render_task_id,
                                     HardwareCompositeOp::PremultipliedAlpha,
                                     DeviceIntPoint::new(
-                                        screen_origin.x - blur_radius.0,
-                                        screen_origin.y - blur_radius.0,
+                                        screen_origin.x - inflate_size,
+                                        screen_origin.y - inflate_size,
                                     ),
                                     next_z,
                                 );

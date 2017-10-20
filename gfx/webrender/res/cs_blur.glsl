@@ -100,7 +100,7 @@ void main(void) {
     gauss_coefficient_sum += gauss_coefficient.x;
     gauss_coefficient.xy *= gauss_coefficient.yz;
 
-    for (int i=1 ; i <= vBlurRadius/2 ; ++i) {
+    for (int i=1 ; i <= vBlurRadius ; ++i) {
         vec2 offset = vOffsetScale * float(i);
 
         vec2 st0 = clamp(vUv.xy - offset, vUvRect.xy, vUvRect.zw);
