@@ -522,7 +522,9 @@ WebRenderCommandBuilder::GenerateFallbackData(nsDisplayItem* aItem,
 
   // XXX not sure if paintSize should be in layer or layoutdevice pixels, it
   // has some sort of scaling applied.
-  LayerIntSize paintSize = RoundedToInt(LayerSize(bounds.Width() * scale.width, bounds.Height() * scale.height));
+  auto scaledBounds = bounds * LayoutDeviceToLayerScale(1);
+  scaledBounds.Scale(scale.width, scale.height);
+  LayerIntSize paintSize = RoundedToInt(scaledBounds).Size();
   if (paintSize.width == 0 || paintSize.height == 0) {
     return nullptr;
   }
